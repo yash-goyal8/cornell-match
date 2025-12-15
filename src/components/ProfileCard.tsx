@@ -23,7 +23,7 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
     >
       <div className="relative rounded-2xl overflow-hidden shadow-card glass">
         {/* Image Section */}
-        <div className="relative h-80 overflow-hidden">
+        <div className="relative h-56 overflow-hidden">
           <img
             src={profile.avatar}
             alt={profile.name}
@@ -38,7 +38,7 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
         </div>
 
         {/* Content Section */}
-        <div className="p-6 space-y-4">
+        <div className="p-5 space-y-3">
           {/* Name and Program */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -50,7 +50,7 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
           </div>
 
           {/* Bio */}
-          <p className="text-muted-foreground text-sm leading-relaxed line-clamp-3">
+          <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
             {profile.bio}
           </p>
 
