@@ -133,7 +133,7 @@ const Index = () => {
         </motion.div>
 
         {/* Cards Stack */}
-        <div className="relative h-[520px] flex items-center justify-center">
+        <div className="relative h-[420px] flex items-center justify-center overflow-hidden">
           <AnimatePresence mode="popLayout">
             {activeTab === 'individuals' ? (
               hasCards ? (
@@ -206,7 +206,7 @@ const Index = () => {
 
         {/* Studio Info */}
         <motion.div
-          className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto"
+          className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto relative z-0"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
