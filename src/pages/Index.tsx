@@ -133,7 +133,7 @@ const Index = () => {
         </motion.div>
 
         {/* Cards Stack */}
-        <div className="relative h-[420px] flex items-center justify-center overflow-hidden">
+        <div className="relative h-[500px] flex items-start justify-center pt-4">
           <AnimatePresence mode="popLayout">
             {activeTab === 'individuals' ? (
               hasCards ? (
