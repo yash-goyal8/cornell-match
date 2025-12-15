@@ -5,30 +5,40 @@ import { SwipeableCard } from '@/components/SwipeableCard';
 import { SwipeableTeamCard } from '@/components/SwipeableTeamCard';
 import { SwipeControls } from '@/components/SwipeControls';
 import { EmptyState } from '@/components/EmptyState';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { mockUsers, mockTeams } from '@/data/mockData';
 import { UserProfile, Team } from '@/types';
 import { toast } from 'sonner';
 
 const Index = () => {
+  const [hasOnboarded, setHasOnboarded] = useState(false);
+  const [currentUser, setCurrentUser] = useState<Omit<UserProfile, 'id' | 'avatar'> | null>(null);
   const [activeTab, setActiveTab] = useState<'individuals' | 'teams'>('individuals');
   const [users, setUsers] = useState<UserProfile[]>(mockUsers);
   const [teams, setTeams] = useState<Team[]>(mockTeams);
   const [matches, setMatches] = useState<string[]>([]);
 
+  const handleOnboardingComplete = (profile: Omit<UserProfile, 'id' | 'avatar'>) => {
+    setCurrentUser(profile);
+    setHasOnboarded(true);
+    toast.success(`Welcome, ${profile.name}!`, {
+      description: "Your profile is ready. Start swiping to find teammates!",
+    });
+  };
+
   const handleUserSwipe = useCallback((direction: 'left' | 'right') => {
     if (users.length === 0) return;
     
-    const currentUser = users[0];
+    const currentUserProfile = users[0];
     
     if (direction === 'right') {
-      // Simulate match (30% chance)
       if (Math.random() < 0.3) {
-        setMatches((prev) => [...prev, currentUser.id]);
+        setMatches((prev) => [...prev, currentUserProfile.id]);
         toast.success(`It's a match! 🎉`, {
-          description: `You and ${currentUser.name} both expressed interest!`,
+          description: `You and ${currentUserProfile.name} both expressed interest!`,
         });
       } else {
-        toast.info(`Interest sent to ${currentUser.name}`, {
+        toast.info(`Interest sent to ${currentUserProfile.name}`, {
           description: "You'll be notified if they're interested too!",
         });
       }
@@ -53,6 +63,10 @@ const Index = () => {
 
   const resetUsers = () => setUsers(mockUsers);
   const resetTeams = () => setTeams(mockTeams);
+
+  if (!hasOnboarded) {
+    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
