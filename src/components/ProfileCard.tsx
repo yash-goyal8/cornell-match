@@ -23,7 +23,7 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
     >
       <div className="relative rounded-2xl overflow-hidden shadow-card glass">
         {/* Image Section */}
-        <div className="relative h-56 overflow-hidden">
+        <div className="relative h-48 overflow-hidden">
           <img
             src={profile.avatar}
             alt={profile.name}
@@ -32,37 +32,35 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
           
           {/* Studio Badge */}
-          <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full text-xs font-semibold ${studioData.color} text-primary-foreground`}>
+          <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold ${studioData.color} text-primary-foreground`}>
             {studioData.name}
           </div>
         </div>
 
         {/* Content Section */}
-        <div className="p-5 space-y-3">
+        <div className="p-4 space-y-3">
           {/* Name and Program */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-foreground">{profile.name}</h2>
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${programColors[profile.program]} text-primary-foreground`}>
-                {profile.program}
-              </span>
-            </div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-foreground">{profile.name}</h2>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${programColors[profile.program]} text-primary-foreground`}>
+              {profile.program}
+            </span>
           </div>
 
           {/* Bio */}
-          <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
+          <p className="text-muted-foreground text-sm leading-relaxed line-clamp-3">
             {profile.bio}
           </p>
 
           {/* Skills */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Sparkles className="w-3 h-3" />
               <span>Skills</span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {profile.skills.map((skill) => (
-                <Badge key={skill} variant="secondary" className="text-xs">
+                <Badge key={skill} variant="secondary" className="text-xs px-2 py-0.5">
                   {skill}
                 </Badge>
               ))}
