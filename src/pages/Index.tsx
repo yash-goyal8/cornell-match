@@ -4,11 +4,16 @@ import { Header } from '@/components/Header';
 import { SwipeableCard } from '@/components/SwipeableCard';
 import { SwipeableTeamCard } from '@/components/SwipeableTeamCard';
 import { SwipeControls } from '@/components/SwipeControls';
-import { EmptyState } from '@/components/EmptyState';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { mockUsers, mockTeams } from '@/data/mockData';
 import { UserProfile, Team } from '@/types';
 import { toast } from 'sonner';
+
+interface SwipeHistory {
+  type: 'user' | 'team';
+  item: UserProfile | Team;
+  direction: 'left' | 'right';
+}
 
 const Index = () => {
   const [hasOnboarded, setHasOnboarded] = useState(false);
@@ -17,6 +22,7 @@ const Index = () => {
   const [users, setUsers] = useState<UserProfile[]>(mockUsers);
   const [teams, setTeams] = useState<Team[]>(mockTeams);
   const [matches, setMatches] = useState<string[]>([]);
+  const [history, setHistory] = useState<SwipeHistory[]>([]);
 
   const handleOnboardingComplete = (profile: Omit<UserProfile, 'id' | 'avatar'>) => {
     setCurrentUser(profile);
@@ -30,6 +36,9 @@ const Index = () => {
     if (users.length === 0) return;
     
     const currentUserProfile = users[0];
+    
+    // Add to history for undo
+    setHistory((prev) => [...prev, { type: 'user', item: currentUserProfile, direction }]);
     
     if (direction === 'right') {
       if (Math.random() < 0.3) {
@@ -52,6 +61,9 @@ const Index = () => {
     
     const currentTeam = teams[0];
     
+    // Add to history for undo
+    setHistory((prev) => [...prev, { type: 'team', item: currentTeam, direction }]);
+    
     if (direction === 'right') {
       toast.success(`Request sent to ${currentTeam.name}!`, {
         description: "The team will review your profile.",
@@ -61,12 +73,38 @@ const Index = () => {
     setTeams((prev) => prev.slice(1));
   }, [teams]);
 
-  const resetUsers = () => setUsers(mockUsers);
-  const resetTeams = () => setTeams(mockTeams);
+  const handleUndo = useCallback(() => {
+    if (history.length === 0) return;
+    
+    const lastAction = history[history.length - 1];
+    
+    if (lastAction.type === 'user' && activeTab === 'individuals') {
+      setUsers((prev) => [lastAction.item as UserProfile, ...prev]);
+      // Remove from matches if it was a match
+      if (lastAction.direction === 'right') {
+        setMatches((prev) => prev.filter((id) => id !== (lastAction.item as UserProfile).id));
+      }
+      toast.info('Undid last swipe');
+    } else if (lastAction.type === 'team' && activeTab === 'teams') {
+      setTeams((prev) => [lastAction.item as Team, ...prev]);
+      toast.info('Undid last swipe');
+    }
+    
+    setHistory((prev) => prev.slice(0, -1));
+  }, [history, activeTab]);
+
+  const canUndo = history.length > 0 && (
+    (activeTab === 'individuals' && history[history.length - 1]?.type === 'user') ||
+    (activeTab === 'teams' && history[history.length - 1]?.type === 'team')
+  );
 
   if (!hasOnboarded) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
+
+  const currentItems = activeTab === 'individuals' ? users : teams;
+  const isLastCard = currentItems.length === 1;
+  const hasCards = currentItems.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,8 +126,8 @@ const Index = () => {
           </h2>
           <p className="text-muted-foreground">
             {activeTab === 'individuals' 
-              ? 'Swipe to find your perfect teammates'
-              : 'Discover teams looking for talent like you'
+              ? `${users.length} ${users.length === 1 ? 'person' : 'people'} to discover`
+              : `${teams.length} ${teams.length === 1 ? 'team' : 'teams'} to explore`
             }
           </p>
         </motion.div>
@@ -98,7 +136,7 @@ const Index = () => {
         <div className="relative h-[520px] flex items-center justify-center">
           <AnimatePresence mode="popLayout">
             {activeTab === 'individuals' ? (
-              users.length > 0 ? (
+              hasCards ? (
                 users.slice(0, 2).map((user, index) => (
                   <SwipeableCard
                     key={user.id}
@@ -108,10 +146,22 @@ const Index = () => {
                   />
                 ))
               ) : (
-                <EmptyState type="individuals" onReset={resetUsers} />
+                <motion.div
+                  key="empty-users"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-12"
+                >
+                  <p className="text-muted-foreground mb-4">You've seen everyone!</p>
+                  {canUndo && (
+                    <p className="text-sm text-muted-foreground">
+                      Use the undo button to go back through profiles
+                    </p>
+                  )}
+                </motion.div>
               )
             ) : (
-              teams.length > 0 ? (
+              hasCards ? (
                 teams.slice(0, 2).map((team, index) => (
                   <SwipeableTeamCard
                     key={team.id}
@@ -121,15 +171,26 @@ const Index = () => {
                   />
                 ))
               ) : (
-                <EmptyState type="teams" onReset={resetTeams} />
+                <motion.div
+                  key="empty-teams"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-12"
+                >
+                  <p className="text-muted-foreground mb-4">You've seen all teams!</p>
+                  {canUndo && (
+                    <p className="text-sm text-muted-foreground">
+                      Use the undo button to go back through teams
+                    </p>
+                  )}
+                </motion.div>
               )
             )}
           </AnimatePresence>
         </div>
 
-        {/* Swipe Controls */}
-        {((activeTab === 'individuals' && users.length > 0) ||
-          (activeTab === 'teams' && teams.length > 0)) && (
+        {/* Swipe Controls - Always show if there's history or cards */}
+        {(hasCards || canUndo) && (
           <SwipeControls
             onSwipeLeft={() => 
               activeTab === 'individuals' ? handleUserSwipe('left') : handleTeamSwipe('left')
@@ -137,6 +198,9 @@ const Index = () => {
             onSwipeRight={() => 
               activeTab === 'individuals' ? handleUserSwipe('right') : handleTeamSwipe('right')
             }
+            onUndo={handleUndo}
+            canUndo={canUndo}
+            isLastCard={isLastCard}
           />
         )}
 

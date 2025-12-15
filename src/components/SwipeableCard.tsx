@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { motion, useMotionValue, useTransform, PanInfo, animate } from 'framer-motion';
 import { UserProfile } from '@/types';
 import { ProfileCard } from './ProfileCard';
 
@@ -10,38 +10,60 @@ interface SwipeableCardProps {
 
 export const SwipeableCard = ({ profile, onSwipe, isTop }: SwipeableCardProps) => {
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-25, 25]);
-  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0, 1, 1, 1, 0]);
+  const rotate = useTransform(x, [-200, 200], [-15, 15]);
   
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
   const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (Math.abs(info.offset.x) > 100) {
-      onSwipe(info.offset.x > 0 ? 'right' : 'left');
+    const threshold = 120;
+    
+    if (info.offset.x > threshold) {
+      // Swipe right - animate out then callback
+      animate(x, 500, { duration: 0.3 });
+      setTimeout(() => onSwipe('right'), 300);
+    } else if (info.offset.x < -threshold) {
+      // Swipe left - animate out then callback
+      animate(x, -500, { duration: 0.3 });
+      setTimeout(() => onSwipe('left'), 300);
+    } else {
+      // Return to center with spring animation
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
     }
   };
 
   if (!isTop) {
     return (
-      <div className="absolute w-full max-w-sm mx-auto scale-95 opacity-50">
+      <motion.div 
+        className="absolute w-full max-w-sm mx-auto"
+        initial={{ scale: 0.95, y: 10 }}
+        animate={{ scale: 0.95, y: 10 }}
+      >
         <ProfileCard profile={profile} />
-      </div>
+      </motion.div>
     );
   }
 
   return (
     <motion.div
-      className="absolute w-full max-w-sm mx-auto cursor-grab active:cursor-grabbing"
-      style={{ x, rotate, opacity }}
+      className="absolute w-full max-w-sm mx-auto cursor-grab active:cursor-grabbing z-10"
+      style={{ x, rotate }}
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.9}
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}
+      initial={{ scale: 1, y: 0 }}
+      animate={{ scale: 1, y: 0 }}
+      exit={{ 
+        x: x.get() > 0 ? 500 : -500,
+        opacity: 0,
+        transition: { duration: 0.3 }
+      }}
     >
       {/* Like indicator */}
       <motion.div
-        className="absolute top-8 right-8 z-10 px-4 py-2 rounded-lg border-4 border-green-500 text-green-500 font-bold text-2xl rotate-12"
+        className="absolute top-8 right-8 z-20 px-4 py-2 rounded-lg border-4 border-green-500 bg-green-500/20 text-green-500 font-bold text-2xl rotate-12"
         style={{ opacity: likeOpacity }}
       >
         LIKE
@@ -49,7 +71,7 @@ export const SwipeableCard = ({ profile, onSwipe, isTop }: SwipeableCardProps) =
 
       {/* Nope indicator */}
       <motion.div
-        className="absolute top-8 left-8 z-10 px-4 py-2 rounded-lg border-4 border-red-500 text-red-500 font-bold text-2xl -rotate-12"
+        className="absolute top-8 left-8 z-20 px-4 py-2 rounded-lg border-4 border-red-500 bg-red-500/20 text-red-500 font-bold text-2xl -rotate-12"
         style={{ opacity: nopeOpacity }}
       >
         PASS
