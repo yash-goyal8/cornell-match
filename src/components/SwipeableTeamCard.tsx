@@ -5,10 +5,11 @@ import { TeamCard } from './TeamCard';
 interface SwipeableTeamCardProps {
   team: Team;
   onSwipe: (direction: 'left' | 'right') => void;
+  onTap: () => void;
   isTop: boolean;
 }
 
-export const SwipeableTeamCard = ({ team, onSwipe, isTop }: SwipeableTeamCardProps) => {
+export const SwipeableTeamCard = ({ team, onSwipe, onTap, isTop }: SwipeableTeamCardProps) => {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-15, 15]);
   
@@ -57,6 +58,11 @@ export const SwipeableTeamCard = ({ team, onSwipe, isTop }: SwipeableTeamCardPro
         opacity: 0,
         transition: { duration: 0.3 }
       }}
+      onTap={(e) => {
+        if (Math.abs(x.get()) < 10) {
+          onTap();
+        }
+      }}
     >
       {/* Join indicator */}
       <motion.div
@@ -73,6 +79,11 @@ export const SwipeableTeamCard = ({ team, onSwipe, isTop }: SwipeableTeamCardPro
       >
         PASS
       </motion.div>
+
+      {/* Tap hint */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-background/60 backdrop-blur text-xs text-muted-foreground">
+        Tap for details
+      </div>
 
       <TeamCard team={team} />
     </motion.div>
