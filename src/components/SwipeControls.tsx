@@ -7,9 +7,10 @@ interface SwipeControlsProps {
   onSwipeRight: () => void;
   onUndo?: () => void;
   canUndo?: boolean;
+  isLastCard?: boolean;
 }
 
-export const SwipeControls = ({ onSwipeLeft, onSwipeRight, onUndo, canUndo }: SwipeControlsProps) => {
+export const SwipeControls = ({ onSwipeLeft, onSwipeRight, onUndo, canUndo, isLastCard }: SwipeControlsProps) => {
   return (
     <motion.div
       className="flex items-center justify-center gap-6 py-8"
@@ -41,6 +42,16 @@ export const SwipeControls = ({ onSwipeLeft, onSwipeRight, onUndo, canUndo }: Sw
       >
         <Heart className="w-7 h-7 text-primary-foreground" />
       </Button>
+
+      {isLastCard && (
+        <motion.span 
+          className="absolute -bottom-8 text-xs text-muted-foreground"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          Last profile - undo to go back
+        </motion.span>
+      )}
     </motion.div>
   );
 };
