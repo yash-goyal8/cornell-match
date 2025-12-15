@@ -5,10 +5,11 @@ import { ProfileCard } from './ProfileCard';
 interface SwipeableCardProps {
   profile: UserProfile;
   onSwipe: (direction: 'left' | 'right') => void;
+  onTap: () => void;
   isTop: boolean;
 }
 
-export const SwipeableCard = ({ profile, onSwipe, isTop }: SwipeableCardProps) => {
+export const SwipeableCard = ({ profile, onSwipe, onTap, isTop }: SwipeableCardProps) => {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-15, 15]);
   
@@ -19,15 +20,12 @@ export const SwipeableCard = ({ profile, onSwipe, isTop }: SwipeableCardProps) =
     const threshold = 120;
     
     if (info.offset.x > threshold) {
-      // Swipe right - animate out then callback
       animate(x, 500, { duration: 0.3 });
       setTimeout(() => onSwipe('right'), 300);
     } else if (info.offset.x < -threshold) {
-      // Swipe left - animate out then callback
       animate(x, -500, { duration: 0.3 });
       setTimeout(() => onSwipe('left'), 300);
     } else {
-      // Return to center with spring animation
       animate(x, 0, { type: 'spring', stiffness: 500, damping: 30 });
     }
   };
@@ -60,6 +58,12 @@ export const SwipeableCard = ({ profile, onSwipe, isTop }: SwipeableCardProps) =
         opacity: 0,
         transition: { duration: 0.3 }
       }}
+      onTap={(e) => {
+        // Only trigger tap if not dragging
+        if (Math.abs(x.get()) < 10) {
+          onTap();
+        }
+      }}
     >
       {/* Like indicator */}
       <motion.div
@@ -76,6 +80,11 @@ export const SwipeableCard = ({ profile, onSwipe, isTop }: SwipeableCardProps) =
       >
         PASS
       </motion.div>
+
+      {/* Tap hint */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-background/60 backdrop-blur text-xs text-muted-foreground">
+        Tap for details
+      </div>
 
       <ProfileCard profile={profile} />
     </motion.div>

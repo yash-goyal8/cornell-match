@@ -5,6 +5,8 @@ import { SwipeableCard } from '@/components/SwipeableCard';
 import { SwipeableTeamCard } from '@/components/SwipeableTeamCard';
 import { SwipeControls } from '@/components/SwipeControls';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { ProfileDetailModal } from '@/components/ProfileDetailModal';
+import { TeamDetailModal } from '@/components/TeamDetailModal';
 import { mockUsers, mockTeams } from '@/data/mockData';
 import { UserProfile, Team } from '@/types';
 import { toast } from 'sonner';
@@ -23,6 +25,12 @@ const Index = () => {
   const [teams, setTeams] = useState<Team[]>(mockTeams);
   const [matches, setMatches] = useState<string[]>([]);
   const [history, setHistory] = useState<SwipeHistory[]>([]);
+  
+  // Modal state
+  const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
   const handleOnboardingComplete = (profile: Omit<UserProfile, 'id' | 'avatar'>) => {
     setCurrentUser(profile);
@@ -37,7 +45,6 @@ const Index = () => {
     
     const currentUserProfile = users[0];
     
-    // Add to history for undo
     setHistory((prev) => [...prev, { type: 'user', item: currentUserProfile, direction }]);
     
     if (direction === 'right') {
@@ -61,7 +68,6 @@ const Index = () => {
     
     const currentTeam = teams[0];
     
-    // Add to history for undo
     setHistory((prev) => [...prev, { type: 'team', item: currentTeam, direction }]);
     
     if (direction === 'right') {
@@ -80,7 +86,6 @@ const Index = () => {
     
     if (lastAction.type === 'user' && activeTab === 'individuals') {
       setUsers((prev) => [lastAction.item as UserProfile, ...prev]);
-      // Remove from matches if it was a match
       if (lastAction.direction === 'right') {
         setMatches((prev) => prev.filter((id) => id !== (lastAction.item as UserProfile).id));
       }
@@ -92,6 +97,16 @@ const Index = () => {
     
     setHistory((prev) => prev.slice(0, -1));
   }, [history, activeTab]);
+
+  const handleProfileTap = (profile: UserProfile) => {
+    setSelectedProfile(profile);
+    setIsProfileModalOpen(true);
+  };
+
+  const handleTeamTap = (team: Team) => {
+    setSelectedTeam(team);
+    setIsTeamModalOpen(true);
+  };
 
   const canUndo = history.length > 0 && (
     (activeTab === 'individuals' && history[history.length - 1]?.type === 'user') ||
@@ -142,6 +157,7 @@ const Index = () => {
                     key={user.id}
                     profile={user}
                     onSwipe={handleUserSwipe}
+                    onTap={() => handleProfileTap(user)}
                     isTop={index === 0}
                   />
                 ))
@@ -167,6 +183,7 @@ const Index = () => {
                     key={team.id}
                     team={team}
                     onSwipe={handleTeamSwipe}
+                    onTap={() => handleTeamTap(team)}
                     isTop={index === 0}
                   />
                 ))
@@ -189,7 +206,7 @@ const Index = () => {
           </AnimatePresence>
         </div>
 
-        {/* Swipe Controls - Always show if there's history or cards */}
+        {/* Swipe Controls */}
         {(hasCards || canUndo) && (
           <SwipeControls
             onSwipeLeft={() => 
@@ -227,6 +244,24 @@ const Index = () => {
           ))}
         </motion.div>
       </main>
+
+      {/* Profile Detail Modal */}
+      <ProfileDetailModal
+        profile={selectedProfile}
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onLike={() => handleUserSwipe('right')}
+        onPass={() => handleUserSwipe('left')}
+      />
+
+      {/* Team Detail Modal */}
+      <TeamDetailModal
+        team={selectedTeam}
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+        onJoin={() => handleTeamSwipe('right')}
+        onPass={() => handleTeamSwipe('left')}
+      />
     </div>
   );
 };
