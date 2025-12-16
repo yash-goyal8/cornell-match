@@ -1,14 +1,16 @@
 import { motion } from 'framer-motion';
-import { Users, User, MessageCircle } from 'lucide-react';
+import { Users, User, MessageCircle, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface HeaderProps {
   activeTab: 'individuals' | 'teams';
   onTabChange: (tab: 'individuals' | 'teams') => void;
   matchCount?: number;
+  onProfileClick?: () => void;
+  userAvatar?: string;
 }
 
-export const Header = ({ activeTab, onTabChange, matchCount = 0 }: HeaderProps) => {
+export const Header = ({ activeTab, onTabChange, matchCount = 0, onProfileClick, userAvatar }: HeaderProps) => {
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
       <div className="container mx-auto px-4">
@@ -50,8 +52,9 @@ export const Header = ({ activeTab, onTabChange, matchCount = 0 }: HeaderProps) 
             </Button>
           </div>
 
-          {/* Matches */}
+          {/* Right side actions */}
           <motion.div
+            className="flex items-center gap-2"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
           >
@@ -62,6 +65,19 @@ export const Header = ({ activeTab, onTabChange, matchCount = 0 }: HeaderProps) 
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full gradient-primary text-xs flex items-center justify-center text-primary-foreground">
                   {matchCount}
                 </span>
+              )}
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onProfileClick}
+              className="rounded-full overflow-hidden w-10 h-10 p-0"
+            >
+              {userAvatar ? (
+                <img src={userAvatar} alt="Your profile" className="w-full h-full object-cover" />
+              ) : (
+                <UserCircle className="w-6 h-6" />
               )}
             </Button>
           </motion.div>

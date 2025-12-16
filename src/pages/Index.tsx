@@ -7,6 +7,7 @@ import { SwipeControls } from '@/components/SwipeControls';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { ProfileDetailModal } from '@/components/ProfileDetailModal';
 import { TeamDetailModal } from '@/components/TeamDetailModal';
+import { MyProfileModal } from '@/components/MyProfileModal';
 import { mockUsers, mockTeams } from '@/data/mockData';
 import { UserProfile, Team } from '@/types';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ const Index = () => {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
 
   const handleOnboardingComplete = (profile: Omit<UserProfile, 'id'>) => {
     setCurrentUser(profile);
@@ -127,6 +129,8 @@ const Index = () => {
         activeTab={activeTab} 
         onTabChange={setActiveTab}
         matchCount={matches.length}
+        onProfileClick={() => setIsMyProfileOpen(true)}
+        userAvatar={currentUser?.avatar}
       />
 
       <main className="container mx-auto px-4 py-8">
@@ -278,6 +282,14 @@ const Index = () => {
         onClose={() => setIsTeamModalOpen(false)}
         onJoin={() => handleTeamSwipe('right')}
         onPass={() => handleTeamSwipe('left')}
+      />
+
+      {/* My Profile Modal */}
+      <MyProfileModal
+        profile={currentUser}
+        isOpen={isMyProfileOpen}
+        onClose={() => setIsMyProfileOpen(false)}
+        onSave={(updatedProfile) => setCurrentUser(updatedProfile)}
       />
     </div>
   );
