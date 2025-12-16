@@ -81,13 +81,6 @@ export const SwipeableCard = ({ profile, onSwipe, onTap, isTop }: SwipeableCardP
         PASS
       </motion.div>
 
-      {/* Swipe hint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-full bg-background/70 backdrop-blur text-xs text-muted-foreground flex items-center gap-2">
-        <span className="animate-pulse">←</span>
-        <span>Swipe or tap for details</span>
-        <span className="animate-pulse">→</span>
-      </div>
-
       <ProfileCard profile={profile} />
     </motion.div>
   );
