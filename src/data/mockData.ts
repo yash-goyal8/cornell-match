@@ -13,7 +13,7 @@ export const mockUsers: UserProfile[] = [
   {
     id: '2',
     name: 'Alex Rodriguez',
-    program: 'MEng',
+    program: 'MEng-CS',
     skills: ['Full-Stack Development', 'Machine Learning', 'Cloud Architecture'],
     bio: 'Software engineer with 5 years experience. Excited to work on impactful tech projects.',
     studioPreference: 'pitech',
@@ -33,7 +33,7 @@ export const mockUsers: UserProfile[] = [
     name: 'Marcus Johnson',
     program: 'CM',
     skills: ['Data Science', 'Python', 'Statistical Analysis'],
-    bio: 'Data enthusiast with a background in healthcare analytics. Looking to apply ML to real-world problems.',
+    bio: 'Data enthusiast with a background in media analytics. Looking to apply ML to real-world problems.',
     studioPreference: 'startup',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop',
   },
@@ -65,7 +65,7 @@ export const mockTeams: Team[] = [
     studio: 'bigco',
     description: 'Partnering with major banks to revolutionize payment systems. Join us to work with Fortune 500 companies.',
     members: [mockUsers[2]],
-    lookingFor: ['MBA', 'MEng', 'CM'],
+    lookingFor: ['MBA', 'MEng-CS', 'CM'],
     skillsNeeded: ['Product Management', 'Backend Development'],
     createdBy: '3',
   },
@@ -91,8 +91,10 @@ export const studioInfo: Record<Studio, { name: string; description: string; col
 
 export const programColors: Record<Program, string> = {
   MBA: 'bg-program-mba',
-  MEng: 'bg-program-meng',
-  LLM: 'bg-program-llm',
   CM: 'bg-program-cm',
   HealthTech: 'bg-program-healthtech',
+  UrbanTech: 'bg-program-urbantech',
+  'MEng-CS': 'bg-program-meng-cs',
+  'MEng-DS': 'bg-program-meng-ds',
+  LLM: 'bg-program-llm',
 };

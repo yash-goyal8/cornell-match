@@ -1,6 +1,6 @@
 export type Studio = 'bigco' | 'startup' | 'pitech';
 
-export type Program = 'MBA' | 'MEng' | 'LLM' | 'CM' | 'HealthTech';
+export type Program = 'MBA' | 'CM' | 'HealthTech' | 'UrbanTech' | 'MEng-CS' | 'MEng-DS' | 'LLM';
 
 export interface UserProfile {
   id: string;

@@ -23,7 +23,7 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
     >
       <div className="relative rounded-2xl overflow-hidden shadow-card glass">
         {/* Image Section */}
-        <div className="relative h-48 overflow-hidden">
+        <div className="relative h-64 overflow-hidden">
           <img
             src={profile.avatar}
             alt={profile.name}
