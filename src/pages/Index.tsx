@@ -19,7 +19,7 @@ interface SwipeHistory {
 
 const Index = () => {
   const [hasOnboarded, setHasOnboarded] = useState(false);
-  const [currentUser, setCurrentUser] = useState<Omit<UserProfile, 'id' | 'avatar'> | null>(null);
+  const [currentUser, setCurrentUser] = useState<Omit<UserProfile, 'id'> | null>(null);
   const [activeTab, setActiveTab] = useState<'individuals' | 'teams'>('individuals');
   const [users, setUsers] = useState<UserProfile[]>(mockUsers);
   const [teams, setTeams] = useState<Team[]>(mockTeams);
@@ -32,7 +32,7 @@ const Index = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
-  const handleOnboardingComplete = (profile: Omit<UserProfile, 'id' | 'avatar'>) => {
+  const handleOnboardingComplete = (profile: Omit<UserProfile, 'id'>) => {
     setCurrentUser(profile);
     setHasOnboarded(true);
     toast.success(`Welcome, ${profile.name}!`, {
@@ -148,7 +148,7 @@ const Index = () => {
         </motion.div>
 
         {/* Cards Stack */}
-        <div className="relative h-[500px] flex items-start justify-center pt-4">
+        <div className="relative h-[420px] flex items-start justify-center">
           <AnimatePresence mode="popLayout">
             {activeTab === 'individuals' ? (
               hasCards ? (

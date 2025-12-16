@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WelcomeStep } from './steps/WelcomeStep';
 import { NameStep } from './steps/NameStep';
+import { PhotoStep } from './steps/PhotoStep';
 import { ProgramStep } from './steps/ProgramStep';
 import { SkillsStep } from './steps/SkillsStep';
 import { BioStep } from './steps/BioStep';
@@ -10,16 +11,17 @@ import { UserProfile, Program, Studio } from '@/types';
 import { Users } from 'lucide-react';
 
 interface OnboardingWizardProps {
-  onComplete: (profile: Omit<UserProfile, 'id' | 'avatar'>) => void;
+  onComplete: (profile: Omit<UserProfile, 'id'>) => void;
 }
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
+    avatar: '',
     program: '' as Program | '',
     skills: [] as string[],
     bio: '',
@@ -48,6 +50,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
         skills: formData.skills,
         bio: formData.bio,
         studioPreference: formData.studioPreference as Studio,
+        avatar: formData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop',
       });
     }
   };
@@ -82,6 +85,15 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
         );
       case 2:
         return (
+          <PhotoStep
+            value={formData.avatar}
+            onChange={(value) => updateFormData('avatar', value)}
+            onNext={nextStep}
+            onBack={prevStep}
+          />
+        );
+      case 3:
+        return (
           <ProgramStep
             value={formData.program}
             onChange={(value) => updateFormData('program', value)}
@@ -89,7 +101,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
             onBack={prevStep}
           />
         );
-      case 3:
+      case 4:
         return (
           <SkillsStep
             value={formData.skills}
@@ -98,7 +110,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
             onBack={prevStep}
           />
         );
-      case 4:
+      case 5:
         return (
           <BioStep
             value={formData.bio}
@@ -107,7 +119,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
             onBack={prevStep}
           />
         );
-      case 5:
+      case 6:
         return (
           <StudioStep
             value={formData.studioPreference}

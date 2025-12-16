@@ -51,10 +51,12 @@
     
     /* Program colors */
     --program-mba: 280 70% 60%;
-    --program-meng: 200 90% 50%;
-    --program-llm: 38 92% 50%;
     --program-cm: 340 80% 55%;
     --program-healthtech: 150 70% 45%;
+    --program-urbantech: 25 90% 55%;
+    --program-meng-cs: 200 90% 50%;
+    --program-meng-ds: 260 80% 60%;
+    --program-llm: 38 92% 50%;
 
     --sidebar-background: 222 47% 8%;
     --sidebar-foreground: 210 40% 98%;

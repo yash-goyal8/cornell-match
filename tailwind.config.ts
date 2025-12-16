@@ -67,10 +67,12 @@ export default {
         },
         program: {
           mba: "hsl(var(--program-mba))",
-          meng: "hsl(var(--program-meng))",
-          llm: "hsl(var(--program-llm))",
           cm: "hsl(var(--program-cm))",
           healthtech: "hsl(var(--program-healthtech))",
+          urbantech: "hsl(var(--program-urbantech))",
+          "meng-cs": "hsl(var(--program-meng-cs))",
+          "meng-ds": "hsl(var(--program-meng-ds))",
+          llm: "hsl(var(--program-llm))",
         },
       },
       borderRadius: {
