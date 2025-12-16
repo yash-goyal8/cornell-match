@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { SwipeableCard } from '@/components/SwipeableCard';
 import { SwipeableTeamCard } from '@/components/SwipeableTeamCard';
-import { SwipeControls } from '@/components/SwipeControls';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { ProfileDetailModal } from '@/components/ProfileDetailModal';
 import { TeamDetailModal } from '@/components/TeamDetailModal';
@@ -227,20 +226,6 @@ const Index = () => {
           </AnimatePresence>
         </div>
 
-        {/* Swipe Controls */}
-        {(hasCards || canUndo) && (
-          <SwipeControls
-            onSwipeLeft={() => 
-              activeTab === 'individuals' ? handleUserSwipe('left') : handleTeamSwipe('left')
-            }
-            onSwipeRight={() => 
-              activeTab === 'individuals' ? handleUserSwipe('right') : handleTeamSwipe('right')
-            }
-            onUndo={handleUndo}
-            canUndo={canUndo}
-            isLastCard={isLastCard}
-          />
-        )}
 
         {/* Studio Info */}
         <motion.div
