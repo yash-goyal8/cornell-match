@@ -1,6 +1,12 @@
 import { motion } from 'framer-motion';
-import { Users, User, MessageCircle, UserCircle } from 'lucide-react';
+import { Users, User, MessageCircle, UserCircle, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface HeaderProps {
   activeTab: 'individuals' | 'teams';
@@ -8,9 +14,10 @@ interface HeaderProps {
   matchCount?: number;
   onProfileClick?: () => void;
   userAvatar?: string;
+  onSignOut?: () => void;
 }
 
-export const Header = ({ activeTab, onTabChange, matchCount = 0, onProfileClick, userAvatar }: HeaderProps) => {
+export const Header = ({ activeTab, onTabChange, matchCount = 0, onProfileClick, userAvatar, onSignOut }: HeaderProps) => {
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
       <div className="container mx-auto px-4">
@@ -68,18 +75,31 @@ export const Header = ({ activeTab, onTabChange, matchCount = 0, onProfileClick,
               )}
             </Button>
             
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={onProfileClick}
-              className="rounded-full overflow-hidden w-10 h-10 p-0"
-            >
-              {userAvatar ? (
-                <img src={userAvatar} alt="Your profile" className="w-full h-full object-cover" />
-              ) : (
-                <UserCircle className="w-6 h-6" />
-              )}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="rounded-full overflow-hidden w-10 h-10 p-0"
+                >
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="Your profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserCircle className="w-6 h-6" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={onProfileClick}>
+                  <UserCircle className="w-4 h-4 mr-2" />
+                  My Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onSignOut} className="text-destructive">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </motion.div>
         </div>
       </div>

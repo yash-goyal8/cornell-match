@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { SwipeableCard } from '@/components/SwipeableCard';
@@ -9,7 +10,10 @@ import { TeamDetailModal } from '@/components/TeamDetailModal';
 import { MyProfileModal } from '@/components/MyProfileModal';
 import { mockUsers, mockTeams } from '@/data/mockData';
 import { UserProfile, Team } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 
 interface SwipeHistory {
   type: 'user' | 'team';
@@ -18,13 +22,15 @@ interface SwipeHistory {
 }
 
 const Index = () => {
-  const [hasOnboarded, setHasOnboarded] = useState(false);
-  const [currentUser, setCurrentUser] = useState<Omit<UserProfile, 'id'> | null>(null);
+  const { user, profile, loading, refreshProfile, signOut } = useAuth();
+  const navigate = useNavigate();
+  
   const [activeTab, setActiveTab] = useState<'individuals' | 'teams'>('individuals');
   const [users, setUsers] = useState<UserProfile[]>(mockUsers);
   const [teams, setTeams] = useState<Team[]>(mockTeams);
   const [matches, setMatches] = useState<string[]>([]);
   const [history, setHistory] = useState<SwipeHistory[]>([]);
+  const [savingProfile, setSavingProfile] = useState(false);
   
   // Modal state
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
@@ -33,12 +39,75 @@ const Index = () => {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
 
-  const handleOnboardingComplete = (profile: Omit<UserProfile, 'id'>) => {
-    setCurrentUser(profile);
-    setHasOnboarded(true);
-    toast.success(`Welcome, ${profile.name}!`, {
-      description: "Your profile is ready. Start swiping to find teammates!",
-    });
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  const handleOnboardingComplete = async (profileData: Omit<UserProfile, 'id'>) => {
+    if (!user) return;
+    
+    setSavingProfile(true);
+    try {
+      const { error } = await supabase.from('profiles').insert({
+        user_id: user.id,
+        name: profileData.name,
+        program: profileData.program,
+        skills: profileData.skills,
+        bio: profileData.bio,
+        studio_preference: profileData.studioPreference,
+        avatar: profileData.avatar,
+        linkedin: profileData.linkedIn,
+      });
+
+      if (error) {
+        console.error('Error saving profile:', error);
+        toast.error('Failed to save profile. Please try again.');
+        return;
+      }
+
+      await refreshProfile();
+      toast.success(`Welcome, ${profileData.name}!`, {
+        description: "Your profile is ready. Start swiping to find teammates!",
+      });
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleProfileUpdate = async (updatedProfile: Omit<UserProfile, 'id'>) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: updatedProfile.name,
+          program: updatedProfile.program,
+          skills: updatedProfile.skills,
+          bio: updatedProfile.bio,
+          studio_preference: updatedProfile.studioPreference,
+          avatar: updatedProfile.avatar,
+          linkedin: updatedProfile.linkedIn,
+        })
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        toast.error('Failed to update profile');
+        return;
+      }
+
+      await refreshProfile();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('An unexpected error occurred');
+    }
   };
 
   const handleUserSwipe = useCallback((direction: 'left' | 'right') => {
@@ -114,13 +183,38 @@ const Index = () => {
     (activeTab === 'teams' && history[history.length - 1]?.type === 'team')
   );
 
-  if (!hasOnboarded) {
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If not logged in, don't render (will redirect)
+  if (!user) {
+    return null;
+  }
+
+  // Show onboarding if no profile
+  if (!profile) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
 
   const currentItems = activeTab === 'individuals' ? users : teams;
   const isLastCard = currentItems.length === 1;
   const hasCards = currentItems.length > 0;
+
+  const currentUserProfile: Omit<UserProfile, 'id'> = {
+    name: profile.name,
+    program: profile.program,
+    skills: profile.skills,
+    bio: profile.bio,
+    studioPreference: profile.studioPreference,
+    avatar: profile.avatar,
+    linkedIn: profile.linkedIn,
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -129,7 +223,8 @@ const Index = () => {
         onTabChange={setActiveTab}
         matchCount={matches.length}
         onProfileClick={() => setIsMyProfileOpen(true)}
-        userAvatar={currentUser?.avatar}
+        userAvatar={profile?.avatar}
+        onSignOut={signOut}
       />
 
       <main className="container mx-auto px-4 py-8">
@@ -271,10 +366,10 @@ const Index = () => {
 
       {/* My Profile Modal */}
       <MyProfileModal
-        profile={currentUser}
+        profile={currentUserProfile}
         isOpen={isMyProfileOpen}
         onClose={() => setIsMyProfileOpen(false)}
-        onSave={(updatedProfile) => setCurrentUser(updatedProfile)}
+        onSave={handleProfileUpdate}
       />
     </div>
   );
