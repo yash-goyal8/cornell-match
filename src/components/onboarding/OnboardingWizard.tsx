@@ -25,6 +25,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
     program: '' as Program | '',
     skills: [] as string[],
     bio: '',
+    linkedIn: '',
     studioPreference: '' as Studio | '',
   });
 
@@ -51,6 +52,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
         bio: formData.bio,
         studioPreference: formData.studioPreference as Studio,
         avatar: formData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop',
+        linkedIn: formData.linkedIn || undefined,
       });
     }
   };
@@ -114,7 +116,9 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
         return (
           <BioStep
             value={formData.bio}
+            linkedIn={formData.linkedIn}
             onChange={(value) => updateFormData('bio', value)}
+            onLinkedInChange={(value) => updateFormData('linkedIn', value)}
             onNext={nextStep}
             onBack={prevStep}
           />

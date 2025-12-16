@@ -132,7 +132,7 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8">
         {/* Hero Text */}
         <motion.div
-          className="text-center mb-8"
+          className="text-center mb-4"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -147,8 +147,25 @@ const Index = () => {
           </p>
         </motion.div>
 
+        {/* Swipe Instructions */}
+        {hasCards && (
+          <motion.div
+            className="flex justify-center gap-4 mb-4 text-xs text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <span className="flex items-center gap-1">
+              <span className="text-destructive">←</span> Pass
+            </span>
+            <span className="border-l border-border pl-4">Tap for details</span>
+            <span className="flex items-center gap-1 border-l border-border pl-4">
+              Like <span className="text-primary">→</span>
+            </span>
+          </motion.div>
+        )}
+
         {/* Cards Stack */}
-        <div className="relative h-[420px] flex items-start justify-center">
+        <div className="relative h-[380px] flex items-start justify-center">
           <AnimatePresence mode="popLayout">
             {activeTab === 'individuals' ? (
               hasCards ? (

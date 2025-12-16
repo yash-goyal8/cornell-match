@@ -51,11 +51,11 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }:
               {/* Scrollable content */}
               <div className="flex-1 overflow-y-auto">
                 {/* Hero Image */}
-                <div className="relative h-72">
+                <div className="relative h-80">
                   <img
                     src={profile.avatar}
                     alt={profile.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover object-top"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
                   
