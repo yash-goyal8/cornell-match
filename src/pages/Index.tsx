@@ -263,68 +263,70 @@ const Index = () => {
         )}
 
         {/* Cards Stack */}
-        <div className="relative h-[380px] flex items-start justify-center">
-          <AnimatePresence mode="popLayout">
-            {activeTab === 'individuals' ? (
-              hasCards ? (
-                users.slice(0, 2).map((user, index) => (
-                  <SwipeableCard
-                    key={user.id}
-                    profile={user}
-                    onSwipe={handleUserSwipe}
-                    onTap={() => handleProfileTap(user)}
-                    isTop={index === 0}
-                  />
-                ))
+        <div className="relative flex items-start justify-center pb-8">
+          <div className="relative w-full max-w-sm h-[420px] sm:h-[460px]">
+            <AnimatePresence mode="popLayout">
+              {activeTab === 'individuals' ? (
+                hasCards ? (
+                  users.slice(0, 2).map((user, index) => (
+                    <SwipeableCard
+                      key={user.id}
+                      profile={user}
+                      onSwipe={handleUserSwipe}
+                      onTap={() => handleProfileTap(user)}
+                      isTop={index === 0}
+                    />
+                  ))
+                ) : (
+                  <motion.div
+                    key="empty-users"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-12"
+                  >
+                    <p className="text-muted-foreground mb-4">You've seen everyone!</p>
+                    {canUndo && (
+                      <p className="text-sm text-muted-foreground">
+                        Use the undo button to go back through profiles
+                      </p>
+                    )}
+                  </motion.div>
+                )
               ) : (
-                <motion.div
-                  key="empty-users"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-center py-12"
-                >
-                  <p className="text-muted-foreground mb-4">You've seen everyone!</p>
-                  {canUndo && (
-                    <p className="text-sm text-muted-foreground">
-                      Use the undo button to go back through profiles
-                    </p>
-                  )}
-                </motion.div>
-              )
-            ) : (
-              hasCards ? (
-                teams.slice(0, 2).map((team, index) => (
-                  <SwipeableTeamCard
-                    key={team.id}
-                    team={team}
-                    onSwipe={handleTeamSwipe}
-                    onTap={() => handleTeamTap(team)}
-                    isTop={index === 0}
-                  />
-                ))
-              ) : (
-                <motion.div
-                  key="empty-teams"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-center py-12"
-                >
-                  <p className="text-muted-foreground mb-4">You've seen all teams!</p>
-                  {canUndo && (
-                    <p className="text-sm text-muted-foreground">
-                      Use the undo button to go back through teams
-                    </p>
-                  )}
-                </motion.div>
-              )
-            )}
-          </AnimatePresence>
+                hasCards ? (
+                  teams.slice(0, 2).map((team, index) => (
+                    <SwipeableTeamCard
+                      key={team.id}
+                      team={team}
+                      onSwipe={handleTeamSwipe}
+                      onTap={() => handleTeamTap(team)}
+                      isTop={index === 0}
+                    />
+                  ))
+                ) : (
+                  <motion.div
+                    key="empty-teams"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-12"
+                  >
+                    <p className="text-muted-foreground mb-4">You've seen all teams!</p>
+                    {canUndo && (
+                      <p className="text-sm text-muted-foreground">
+                        Use the undo button to go back through teams
+                      </p>
+                    )}
+                  </motion.div>
+                )
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
 
         {/* Studio Info */}
         <motion.div
-          className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto relative z-0"
+          className="grid grid-cols-3 gap-2 sm:gap-4 max-w-3xl mx-auto"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -336,11 +338,11 @@ const Index = () => {
           ].map((studio) => (
             <div
               key={studio.name}
-              className="p-4 rounded-xl glass text-center hover:scale-105 transition-transform cursor-pointer"
+              className="p-2 sm:p-4 rounded-xl glass text-center hover:scale-105 transition-transform cursor-pointer"
             >
-              <div className={`w-3 h-3 rounded-full ${studio.color} mx-auto mb-2`} />
-              <h4 className="font-semibold text-foreground text-sm">{studio.name}</h4>
-              <p className="text-xs text-muted-foreground">{studio.desc}</p>
+              <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${studio.color} mx-auto mb-1 sm:mb-2`} />
+              <h4 className="font-semibold text-foreground text-xs sm:text-sm">{studio.name}</h4>
+              <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{studio.desc}</p>
             </div>
           ))}
         </motion.div>
