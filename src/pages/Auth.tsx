@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Users, Mail, Lock, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { Users, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -20,15 +20,14 @@ const passwordSchema = z.string()
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number');
 
-type AuthMode = 'signup' | 'verify' | 'login';
+type AuthMode = 'signup' | 'login';
 
 const Auth = () => {
   const [mode, setMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; otp?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -84,8 +83,7 @@ const Auth = () => {
 
     setLoading(true);
     try {
-      // First create the user account
-      const { error: signUpError, data } = await supabase.auth.signUp({
+      const { error, data } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
         options: {
@@ -93,63 +91,26 @@ const Auth = () => {
         },
       });
 
-      if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
+      if (error) {
+        if (error.message.includes('already registered')) {
           toast.error('This email is already registered. Please log in instead.');
           setMode('login');
         } else {
-          toast.error(signUpError.message);
+          toast.error(error.message);
         }
         return;
       }
 
-      // If user already exists but not confirmed, or new user created
-      // Send OTP for email verification
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.toLowerCase().trim(),
-        options: {
-          shouldCreateUser: false,
-        },
-      });
-
-      if (otpError) {
-        toast.error(otpError.message);
-        return;
+      // With auto-confirm enabled, user should be signed in immediately
+      if (data.session) {
+        toast.success('Account created! Welcome to TeamMatch!');
+        navigate('/');
+      } else {
+        toast.success('Account created! Please log in.');
+        setMode('login');
       }
-
-      toast.success('Verification code sent to your email!');
-      setMode('verify');
     } catch (error: any) {
       toast.error('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otp || otp.length !== 6) {
-      setErrors({ otp: 'Please enter the 6-digit code' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: email.toLowerCase().trim(),
-        token: otp,
-        type: 'email',
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      toast.success('Email verified! Welcome to TeamMatch!');
-      navigate('/');
-    } catch (error: any) {
-      toast.error('Verification failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -176,9 +137,6 @@ const Auth = () => {
       if (error) {
         if (error.message.includes('Invalid login')) {
           toast.error('Invalid email or password');
-        } else if (error.message.includes('Email not confirmed')) {
-          toast.error('Please verify your email first');
-          setMode('verify');
         } else {
           toast.error(error.message);
         }
@@ -189,29 +147,6 @@ const Auth = () => {
       navigate('/');
     } catch (error: any) {
       toast.error('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.toLowerCase().trim(),
-        options: {
-          shouldCreateUser: false,
-        },
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      toast.success('New verification code sent!');
-    } catch (error) {
-      toast.error('Failed to resend code');
     } finally {
       setLoading(false);
     }
@@ -316,69 +251,6 @@ const Auth = () => {
                     Log in
                   </button>
                 </p>
-              </motion.div>
-            )}
-
-            {mode === 'verify' && (
-              <motion.div
-                key="verify"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-8"
-              >
-                <div className="text-center space-y-2">
-                  <div className="w-16 h-16 rounded-full gradient-primary mx-auto flex items-center justify-center mb-4">
-                    <CheckCircle className="w-8 h-8 text-primary-foreground" />
-                  </div>
-                  <h2 className="text-3xl font-bold text-foreground">Verify Email</h2>
-                  <p className="text-muted-foreground">
-                    We sent a 6-digit code to<br />
-                    <span className="text-foreground font-medium">{email}</span>
-                  </p>
-                </div>
-
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Input
-                      type="text"
-                      placeholder="Enter 6-digit code"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="h-14 text-center text-2xl tracking-widest bg-secondary border-border"
-                      maxLength={6}
-                    />
-                    {errors.otp && (
-                      <p className="text-sm text-destructive text-center flex items-center justify-center gap-1">
-                        <AlertCircle className="w-4 h-4" />
-                        {errors.otp}
-                      </p>
-                    )}
-                  </div>
-
-                  <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                    {loading ? 'Verifying...' : 'Verify Email'}
-                  </Button>
-                </form>
-
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Didn't receive the code?{' '}
-                    <button
-                      onClick={handleResendOtp}
-                      disabled={loading}
-                      className="text-primary hover:underline font-medium"
-                    >
-                      Resend
-                    </button>
-                  </p>
-                  <button
-                    onClick={() => setMode('signup')}
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    ← Back to sign up
-                  </button>
-                </div>
               </motion.div>
             )}
 
