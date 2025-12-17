@@ -84,7 +84,8 @@ const Auth = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      // First create the user account
+      const { error: signUpError, data } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
         options: {
@@ -92,13 +93,27 @@ const Auth = () => {
         },
       });
 
-      if (error) {
-        if (error.message.includes('already registered')) {
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
           toast.error('This email is already registered. Please log in instead.');
           setMode('login');
         } else {
-          toast.error(error.message);
+          toast.error(signUpError.message);
         }
+        return;
+      }
+
+      // If user already exists but not confirmed, or new user created
+      // Send OTP for email verification
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: email.toLowerCase().trim(),
+        options: {
+          shouldCreateUser: false,
+        },
+      });
+
+      if (otpError) {
+        toast.error(otpError.message);
         return;
       }
 
@@ -123,7 +138,7 @@ const Auth = () => {
       const { error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
         token: otp,
-        type: 'signup',
+        type: 'email',
       });
 
       if (error) {
@@ -182,9 +197,11 @@ const Auth = () => {
   const handleResendOtp = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
+      const { error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
+        options: {
+          shouldCreateUser: false,
+        },
       });
 
       if (error) {
