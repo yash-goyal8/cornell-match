@@ -22,14 +22,14 @@ export const TeamCard = ({ team }: TeamCardProps) => {
     >
       <div className="rounded-2xl overflow-hidden shadow-card glass">
         {/* Header */}
-        <div className="p-5 gradient-card border-b border-border/50">
+        <div className="p-4 sm:p-5 gradient-card border-b border-border/50">
           <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-11 h-11 rounded-xl ${studioData.color} flex items-center justify-center`}>
-                <Users className="w-5 h-5 text-primary-foreground" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl ${studioData.color} flex items-center justify-center`}>
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-foreground">{team.name}</h2>
+                <h2 className="text-base sm:text-lg font-bold text-foreground">{team.name}</h2>
                 <p className="text-xs text-muted-foreground">{studioData.name}</p>
               </div>
             </div>
@@ -58,7 +58,7 @@ export const TeamCard = ({ team }: TeamCardProps) => {
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-3">
+        <div className="p-4 sm:p-5 space-y-3">
           <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2">
             {team.description}
           </p>
