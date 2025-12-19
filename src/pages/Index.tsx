@@ -9,7 +9,7 @@ import { ProfileDetailModal } from '@/components/ProfileDetailModal';
 import { TeamDetailModal } from '@/components/TeamDetailModal';
 import { MyProfileModal } from '@/components/MyProfileModal';
 import { mockUsers, mockTeams } from '@/data/mockData';
-import { UserProfile, Team } from '@/types';
+import { UserProfile, Team, Program, Studio } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -39,12 +39,12 @@ const Index = () => {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
 
-  // Redirect to auth if not logged in
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
-  }, [user, loading, navigate]);
+  // DEV MODE: Skip auth redirect
+  // useEffect(() => {
+  //   if (!loading && !user) {
+  //     navigate('/auth');
+  //   }
+  // }, [user, loading, navigate]);
 
   const handleOnboardingComplete = async (profileData: Omit<UserProfile, 'id'>) => {
     if (!user) return;
@@ -192,21 +192,22 @@ const Index = () => {
     );
   }
 
-  // If not logged in, don't render (will redirect)
-  if (!user) {
-    return null;
-  }
+  // DEV MODE: Skip user check
+  // if (!user) {
+  //   return null;
+  // }
 
-  // Show onboarding if no profile
-  if (!profile) {
-    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
-  }
+  // DEV MODE: Skip profile check - go straight to main UI
+  // if (!profile) {
+  //   return <OnboardingWizard onComplete={handleOnboardingComplete} />;
+  // }
 
   const currentItems = activeTab === 'individuals' ? users : teams;
   const isLastCard = currentItems.length === 1;
   const hasCards = currentItems.length > 0;
 
-  const currentUserProfile: Omit<UserProfile, 'id'> = {
+  // DEV MODE: Use mock profile when no real profile exists
+  const currentUserProfile: Omit<UserProfile, 'id'> = profile ? {
     name: profile.name,
     program: profile.program,
     skills: profile.skills,
@@ -214,6 +215,14 @@ const Index = () => {
     studioPreference: profile.studioPreference,
     avatar: profile.avatar,
     linkedIn: profile.linkedIn,
+  } : {
+    name: 'Dev User',
+    program: 'MBA' as Program,
+    skills: ['Development', 'Design'],
+    bio: 'Testing in dev mode',
+    studioPreference: 'startup' as Studio,
+    avatar: '',
+    linkedIn: '',
   };
 
   return (
