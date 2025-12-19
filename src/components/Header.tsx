@@ -13,11 +13,12 @@ interface HeaderProps {
   onTabChange: (tab: 'individuals' | 'teams') => void;
   matchCount?: number;
   onProfileClick?: () => void;
+  onChatClick?: () => void;
   userAvatar?: string;
   onSignOut?: () => void;
 }
 
-export const Header = ({ activeTab, onTabChange, matchCount = 0, onProfileClick, userAvatar, onSignOut }: HeaderProps) => {
+export const Header = ({ activeTab, onTabChange, matchCount = 0, onProfileClick, onChatClick, userAvatar, onSignOut }: HeaderProps) => {
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
       <div className="container mx-auto px-4">
@@ -65,9 +66,14 @@ export const Header = ({ activeTab, onTabChange, matchCount = 0, onProfileClick,
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
           >
-            <Button variant="glass" size="sm" className="gap-2 relative">
+            <Button 
+              variant="glass" 
+              size="sm" 
+              className="gap-2 relative"
+              onClick={onChatClick}
+            >
               <MessageCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Matches</span>
+              <span className="hidden sm:inline">Messages</span>
               {matchCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full gradient-primary text-xs flex items-center justify-center text-primary-foreground">
                   {matchCount}

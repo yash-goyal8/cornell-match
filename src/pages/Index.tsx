@@ -8,6 +8,7 @@ import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { ProfileDetailModal } from '@/components/ProfileDetailModal';
 import { TeamDetailModal } from '@/components/TeamDetailModal';
 import { MyProfileModal } from '@/components/MyProfileModal';
+import { ChatModal } from '@/components/chat/ChatModal';
 import { mockUsers, mockTeams } from '@/data/mockData';
 import { UserProfile, Team, Program, Studio } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +39,7 @@ const Index = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // DEV MODE: Skip auth redirect
   // useEffect(() => {
@@ -232,6 +234,7 @@ const Index = () => {
         onTabChange={setActiveTab}
         matchCount={matches.length}
         onProfileClick={() => setIsMyProfileOpen(true)}
+        onChatClick={() => setIsChatOpen(true)}
         userAvatar={profile?.avatar}
         onSignOut={signOut}
       />
@@ -381,6 +384,13 @@ const Index = () => {
         isOpen={isMyProfileOpen}
         onClose={() => setIsMyProfileOpen(false)}
         onSave={handleProfileUpdate}
+      />
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        currentUserId={user?.id || 'dev-user'}
       />
     </div>
   );
