@@ -1,152 +1,70 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Users, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { Users, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { z } from 'zod';
-
-const emailSchema = z.string()
-  .email('Please enter a valid email address')
-  .refine((email) => email.toLowerCase().endsWith('.edu'), {
-    message: 'Please use your Cornell (.edu) email address',
-  });
-
-const passwordSchema = z.string()
-  .min(8, 'Password must be at least 8 characters')
-  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number');
-
-type AuthMode = 'signup' | 'login';
 
 const Auth = () => {
-  const [mode, setMode] = useState<AuthMode>('signup');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        const email = session.user.email?.toLowerCase() || '';
+        
+        // Validate Cornell email
+        if (!email.endsWith('.edu')) {
+          toast.error('Please use your Cornell (.edu) email address');
+          await supabase.auth.signOut();
+          setError('Only Cornell (.edu) email addresses are allowed');
+          return;
+        }
+        
         navigate('/');
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        navigate('/');
+        const email = session.user.email?.toLowerCase() || '';
+        if (email.endsWith('.edu')) {
+          navigate('/');
+        } else {
+          supabase.auth.signOut();
+          setError('Only Cornell (.edu) email addresses are allowed');
+        }
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const validateEmail = (value: string): boolean => {
-    try {
-      emailSchema.parse(value);
-      setErrors(prev => ({ ...prev, email: undefined }));
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        setErrors(prev => ({ ...prev, email: error.errors[0].message }));
-      }
-      return false;
-    }
-  };
-
-  const validatePassword = (value: string): boolean => {
-    try {
-      passwordSchema.parse(value);
-      setErrors(prev => ({ ...prev, password: undefined }));
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        setErrors(prev => ({ ...prev, password: error.errors[0].message }));
-      }
-      return false;
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    
-    const isEmailValid = validateEmail(email);
-    const isPasswordValid = validatePassword(password);
-    
-    if (!isEmailValid || !isPasswordValid) return;
-
+  const handleGoogleSignIn = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
-      const { error, data } = await supabase.auth.signUp({
-        email: email.toLowerCase().trim(),
-        password,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/auth`,
+          queryParams: {
+            hd: 'cornell.edu', // Restrict to Cornell domain
+          },
         },
       });
 
       if (error) {
-        if (error.message.includes('already registered')) {
-          toast.error('This email is already registered. Please log in instead.');
-          setMode('login');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      // With auto-confirm enabled, user should be signed in immediately
-      if (data.session) {
-        toast.success('Account created! Welcome to TeamMatch!');
-        navigate('/');
-      } else {
-        toast.success('Account created! Please log in.');
-        setMode('login');
+        toast.error(error.message);
+        setError(error.message);
       }
     } catch (error: any) {
       toast.error('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    
-    const isEmailValid = validateEmail(email);
-    if (!isEmailValid) return;
-    if (!password) {
-      setErrors(prev => ({ ...prev, password: 'Password is required' }));
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
-        password,
-      });
-
-      if (error) {
-        if (error.message.includes('Invalid login')) {
-          toast.error('Invalid email or password');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      toast.success('Welcome back!');
-      navigate('/');
-    } catch (error: any) {
-      toast.error('An unexpected error occurred');
+      setError('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -170,165 +88,62 @@ const Auth = () => {
       {/* Content */}
       <div className="flex-1 flex items-center justify-center px-6 pb-12">
         <div className="w-full max-w-md">
-          <AnimatePresence mode="wait">
-            {mode === 'signup' && (
-              <motion.div
-                key="signup"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-8"
-              >
-                <div className="text-center space-y-2">
-                  <h2 className="text-3xl font-bold text-foreground">Create Account</h2>
-                  <p className="text-muted-foreground">
-                    Use your Cornell (.edu) email to sign up
-                  </p>
-                </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-bold text-foreground">Welcome to TeamMatch</h2>
+              <p className="text-muted-foreground">
+                Sign in with your Cornell Google account
+              </p>
+            </div>
 
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <Input
-                        type="email"
-                        placeholder="yourname@cornell.edu"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          if (errors.email) validateEmail(e.target.value);
-                        }}
-                        onBlur={() => email && validateEmail(email)}
-                        className="pl-11 h-12 bg-secondary border-border"
-                      />
-                    </div>
-                    {errors.email && (
-                      <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="w-4 h-4" />
-                        {errors.email}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <Input
-                        type="password"
-                        placeholder="Create a password"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (errors.password) validatePassword(e.target.value);
-                        }}
-                        onBlur={() => password && validatePassword(password)}
-                        className="pl-11 h-12 bg-secondary border-border"
-                      />
-                    </div>
-                    {errors.password && (
-                      <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="w-4 h-4" />
-                        {errors.password}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Min 8 characters, 1 uppercase, 1 lowercase, 1 number
-                    </p>
-                  </div>
-
-                  <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                    {loading ? 'Creating account...' : 'Sign Up'}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </form>
-
-                <p className="text-center text-sm text-muted-foreground">
-                  Already have an account?{' '}
-                  <button
-                    onClick={() => setMode('login')}
-                    className="text-primary hover:underline font-medium"
-                  >
-                    Log in
-                  </button>
-                </p>
-              </motion.div>
+            {error && (
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p className="text-sm">{error}</p>
+              </div>
             )}
 
-            {mode === 'login' && (
-              <motion.div
-                key="login"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-8"
-              >
-                <div className="text-center space-y-2">
-                  <h2 className="text-3xl font-bold text-foreground">Welcome Back</h2>
-                  <p className="text-muted-foreground">
-                    Log in with your Cornell email
-                  </p>
-                </div>
+            <Button 
+              onClick={handleGoogleSignIn} 
+              size="lg" 
+              className="w-full h-14 text-base"
+              disabled={loading}
+            >
+              {loading ? (
+                'Connecting...'
+              ) : (
+                <span className="flex items-center gap-3">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path
+                      fill="currentColor"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
+                  </svg>
+                  Continue with Google
+                </span>
+              )}
+            </Button>
 
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <Input
-                        type="email"
-                        placeholder="yourname@cornell.edu"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          if (errors.email) validateEmail(e.target.value);
-                        }}
-                        className="pl-11 h-12 bg-secondary border-border"
-                      />
-                    </div>
-                    {errors.email && (
-                      <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="w-4 h-4" />
-                        {errors.email}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <Input
-                        type="password"
-                        placeholder="Your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-11 h-12 bg-secondary border-border"
-                      />
-                    </div>
-                    {errors.password && (
-                      <p className="text-sm text-destructive flex items-center gap-1">
-                        <AlertCircle className="w-4 h-4" />
-                        {errors.password}
-                      </p>
-                    )}
-                  </div>
-
-                  <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                    {loading ? 'Logging in...' : 'Log In'}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </form>
-
-                <p className="text-center text-sm text-muted-foreground">
-                  Don't have an account?{' '}
-                  <button
-                    onClick={() => setMode('signup')}
-                    className="text-primary hover:underline font-medium"
-                  >
-                    Sign up
-                  </button>
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <p className="text-center text-xs text-muted-foreground">
+              Only Cornell (.edu) email addresses are accepted
+            </p>
+          </motion.div>
         </div>
       </div>
     </div>
