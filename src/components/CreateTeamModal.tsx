@@ -85,21 +85,21 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
 
           <div className="space-y-3">
             <Label>Studio Preference *</Label>
-            <RadioGroup value={studio} onValueChange={(v) => setStudio(v as Studio)}>
+            <RadioGroup value={studio} onValueChange={(v) => setStudio(v as Studio)} className="space-y-2">
               {studioOptions.map((option) => (
-                <div
+                <label
                   key={option.value}
+                  htmlFor={option.value}
                   className="flex items-start space-x-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors cursor-pointer"
-                  onClick={() => setStudio(option.value)}
                 >
                   <RadioGroupItem value={option.value} id={option.value} className="mt-0.5" />
                   <div className="flex-1">
-                    <Label htmlFor={option.value} className="font-medium cursor-pointer">
+                    <span className="font-medium">
                       {option.label}
-                    </Label>
+                    </span>
                     <p className="text-xs text-muted-foreground">{option.description}</p>
                   </div>
-                </div>
+                </label>
               ))}
             </RadioGroup>
           </div>
