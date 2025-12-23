@@ -365,14 +365,14 @@ const Index = () => {
 
       if (teamError) throw teamError;
 
-      // 2. Add creator as admin member
+      // 2. Add creator as owner member
       const { error: memberError } = await supabase
         .from('team_members')
         .insert({
           team_id: newTeam.id,
           user_id: user.id,
-          role: 'admin',
-          status: 'active',
+          role: 'owner',
+          status: 'confirmed',
         });
 
       if (memberError) throw memberError;
