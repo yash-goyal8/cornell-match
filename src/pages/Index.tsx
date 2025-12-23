@@ -28,18 +28,32 @@ const Index = () => {
   
   const [activeTab, setActiveTab] = useState<'individuals' | 'teams'>('individuals');
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [teams, setTeams] = useState<Team[]>(mockTeams);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<string[]>([]);
   const [history, setHistory] = useState<SwipeHistory[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
+  const [loadingTeams, setLoadingTeams] = useState(true);
 
-  // Fetch real profiles from database (excluding current user)
+  // Fetch profiles of users NOT in any team (excluding current user)
   useEffect(() => {
     const fetchProfiles = async () => {
       if (!user) return;
       
       setLoadingProfiles(true);
       try {
+        // First get all user_ids who are active team members
+        const { data: teamMembers, error: tmError } = await supabase
+          .from('team_members')
+          .select('user_id')
+          .eq('status', 'active');
+
+        if (tmError) {
+          console.error('Error fetching team members:', tmError);
+        }
+
+        const usersInTeams = new Set((teamMembers || []).map(tm => tm.user_id));
+
+        // Fetch all profiles except current user
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -51,8 +65,11 @@ const Index = () => {
           return;
         }
 
+        // Filter out users who are already in a team
+        const availableProfiles = (data || []).filter(p => !usersInTeams.has(p.user_id));
+
         // Transform database profiles to UserProfile format
-        const transformedProfiles: UserProfile[] = (data || []).map((p) => ({
+        const transformedProfiles: UserProfile[] = availableProfiles.map((p) => ({
           id: p.id,
           name: p.name,
           program: p.program as Program,
@@ -73,6 +90,98 @@ const Index = () => {
 
     if (profile) {
       fetchProfiles();
+    }
+  }, [user, profile]);
+
+  // Fetch real teams with their members from database
+  useEffect(() => {
+    const fetchTeams = async () => {
+      if (!user) return;
+      
+      setLoadingTeams(true);
+      try {
+        // Fetch all teams
+        const { data: teamsData, error: teamsError } = await supabase
+          .from('teams')
+          .select('*');
+
+        if (teamsError) {
+          console.error('Error fetching teams:', teamsError);
+          toast.error('Failed to load teams');
+          return;
+        }
+
+        if (!teamsData || teamsData.length === 0) {
+          setTeams([]);
+          return;
+        }
+
+        // Fetch all team members with their profiles
+        const { data: membersData, error: membersError } = await supabase
+          .from('team_members')
+          .select(`
+            team_id,
+            user_id,
+            role,
+            profiles!team_members_user_id_fkey (
+              id,
+              name,
+              program,
+              skills,
+              bio,
+              studio_preference,
+              avatar,
+              linkedin
+            )
+          `)
+          .eq('status', 'active');
+
+        if (membersError) {
+          console.error('Error fetching team members:', membersError);
+        }
+
+        // Group members by team
+        const membersByTeam: Record<string, any[]> = {};
+        (membersData || []).forEach(member => {
+          if (!membersByTeam[member.team_id]) {
+            membersByTeam[member.team_id] = [];
+          }
+          if (member.profiles) {
+            membersByTeam[member.team_id].push({
+              id: member.profiles.id,
+              name: member.profiles.name,
+              program: member.profiles.program as Program,
+              skills: member.profiles.skills || [],
+              bio: member.profiles.bio || '',
+              studioPreference: member.profiles.studio_preference as Studio,
+              avatar: member.profiles.avatar || undefined,
+              linkedIn: member.profiles.linkedin || undefined,
+              role: member.role,
+            });
+          }
+        });
+
+        // Transform teams data
+        const transformedTeams: Team[] = teamsData.map((t) => ({
+          id: t.id,
+          name: t.name,
+          description: t.description || '',
+          studio: t.studio as Studio,
+          members: membersByTeam[t.id] || [],
+          lookingFor: [], // Can be added to teams table later
+          skillsNeeded: [], // Can be added to teams table later
+        }));
+
+        setTeams(transformedTeams);
+      } catch (error) {
+        console.error('Error fetching teams:', error);
+      } finally {
+        setLoadingTeams(false);
+      }
+    };
+
+    if (profile) {
+      fetchTeams();
     }
   }, [user, profile]);
   const [savingProfile, setSavingProfile] = useState(false);
