@@ -9,6 +9,7 @@ import { Team, UserProfile, Program, Studio } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Users, Crown, MoreVertical, UserPlus, Shield, UserMinus, Loader2, MessageSquare } from 'lucide-react';
+import { MemberProfileModal } from './MemberProfileModal';
 
 interface TeamMember extends UserProfile {
   role: string;
@@ -35,6 +36,7 @@ export const TeamManagementModal = ({
   const [loading, setLoading] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [addingMember, setAddingMember] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
 
   const isCurrentUserAdmin = members.some(m => m.id === currentUserId && m.role === 'admin') || 
                               team?.createdBy === currentUserId;
@@ -342,7 +344,8 @@ export const TeamManagementModal = ({
                   {members.map((member) => (
                     <div 
                       key={member.memberId}
-                      className="flex items-center justify-between p-3 rounded-lg bg-accent/20"
+                      className="flex items-center justify-between p-3 rounded-lg bg-accent/20 hover:bg-accent/30 transition-colors cursor-pointer"
+                      onClick={() => setSelectedMember(member)}
                     >
                       <div className="flex items-center gap-3">
                         <Avatar className="w-10 h-10">
@@ -369,21 +372,31 @@ export const TeamManagementModal = ({
                       {isCurrentUserAdmin && member.id !== currentUserId && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {member.role === 'admin' ? (
                               <DropdownMenuItem 
-                                onClick={() => handleDemoteFromAdmin(member.memberId, member.name)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDemoteFromAdmin(member.memberId, member.name);
+                                }}
                               >
                                 <Shield className="w-4 h-4 mr-2" />
                                 Remove Admin
                               </DropdownMenuItem>
                             ) : (
                               <DropdownMenuItem 
-                                onClick={() => handlePromoteToAdmin(member.memberId, member.name)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePromoteToAdmin(member.memberId, member.name);
+                                }}
                               >
                                 <Crown className="w-4 h-4 mr-2" />
                                 Make Admin
@@ -391,7 +404,10 @@ export const TeamManagementModal = ({
                             )}
                             <DropdownMenuItem 
                               className="text-destructive"
-                              onClick={() => handleRemoveMember(member.memberId, member.id, member.name)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveMember(member.memberId, member.id, member.name);
+                              }}
                             >
                               <UserMinus className="w-4 h-4 mr-2" />
                               Remove from Team
@@ -406,6 +422,13 @@ export const TeamManagementModal = ({
             )}
           </div>
         </div>
+
+        {/* Member Profile Modal */}
+        <MemberProfileModal
+          profile={selectedMember}
+          isOpen={!!selectedMember}
+          onClose={() => setSelectedMember(null)}
+        />
       </DialogContent>
     </Dialog>
   );
