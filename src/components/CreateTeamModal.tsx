@@ -5,13 +5,20 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
 import { Studio } from '@/types';
-import { Users, Loader2 } from 'lucide-react';
+import { Users, Loader2, X } from 'lucide-react';
 
 interface CreateTeamModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateTeam: (teamData: { name: string; description: string; studio: Studio }) => Promise<void>;
+  onCreateTeam: (teamData: { 
+    name: string; 
+    description: string; 
+    studio: Studio;
+    lookingFor: string;
+    skillsNeeded: string[];
+  }) => Promise<void>;
 }
 
 const studioOptions: { value: Studio; label: string; description: string }[] = [
@@ -20,11 +27,36 @@ const studioOptions: { value: Studio; label: string; description: string }[] = [
   { value: 'pitech', label: 'PiTech Studio', description: 'Tech for social good' },
 ];
 
+const skillOptions = [
+  'Full-Stack Development',
+  'Frontend Development',
+  'Backend Development',
+  'Machine Learning',
+  'Data Science',
+  'Product Management',
+  'UI/UX Design',
+  'Marketing',
+  'Finance',
+  'Operations',
+  'Sales',
+  'Business Development',
+];
+
 export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamModalProps) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [studio, setStudio] = useState<Studio>('startup');
+  const [lookingFor, setLookingFor] = useState('');
+  const [skillsNeeded, setSkillsNeeded] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+
+  const toggleSkill = (skill: string) => {
+    setSkillsNeeded(prev => 
+      prev.includes(skill) 
+        ? prev.filter(s => s !== skill)
+        : [...prev, skill]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,11 +64,19 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
 
     setIsCreating(true);
     try {
-      await onCreateTeam({ name: name.trim(), description: description.trim(), studio });
+      await onCreateTeam({ 
+        name: name.trim(), 
+        description: description.trim(), 
+        studio,
+        lookingFor: lookingFor.trim(),
+        skillsNeeded,
+      });
       // Reset form
       setName('');
       setDescription('');
       setStudio('startup');
+      setLookingFor('');
+      setSkillsNeeded([]);
       onClose();
     } catch (error) {
       console.error('Error creating team:', error);
@@ -47,7 +87,7 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />
@@ -79,8 +119,39 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={300}
-              rows={3}
+              rows={2}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="looking-for">Looking For</Label>
+            <Textarea
+              id="looking-for"
+              placeholder="What kind of teammates are you looking for? (e.g., A technical co-founder with ML experience)"
+              value={lookingFor}
+              onChange={(e) => setLookingFor(e.target.value)}
+              maxLength={200}
+              rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Skills Needed</Label>
+            <div className="flex flex-wrap gap-2">
+              {skillOptions.map((skill) => (
+                <Badge
+                  key={skill}
+                  variant={skillsNeeded.includes(skill) ? "default" : "outline"}
+                  className="cursor-pointer transition-colors"
+                  onClick={() => toggleSkill(skill)}
+                >
+                  {skill}
+                  {skillsNeeded.includes(skill) && (
+                    <X className="w-3 h-3 ml-1" />
+                  )}
+                </Badge>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-3">

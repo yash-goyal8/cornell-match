@@ -347,7 +347,13 @@ const Index = () => {
     }
   };
 
-  const handleCreateTeam = async (teamData: { name: string; description: string; studio: Studio }) => {
+  const handleCreateTeam = async (teamData: { 
+    name: string; 
+    description: string; 
+    studio: Studio;
+    lookingFor: string;
+    skillsNeeded: string[];
+  }) => {
     if (!user) return;
 
     try {
@@ -358,6 +364,8 @@ const Index = () => {
           name: teamData.name,
           description: teamData.description,
           studio: teamData.studio,
+          looking_for: teamData.lookingFor,
+          skills_needed: teamData.skillsNeeded,
           created_by: user.id,
         })
         .select()

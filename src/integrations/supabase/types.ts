@@ -227,7 +227,9 @@ export type Database = {
           created_by: string
           description: string | null
           id: string
+          looking_for: string | null
           name: string
+          skills_needed: string[] | null
           studio: string
           updated_at: string
         }
@@ -236,7 +238,9 @@ export type Database = {
           created_by: string
           description?: string | null
           id?: string
+          looking_for?: string | null
           name: string
+          skills_needed?: string[] | null
           studio: string
           updated_at?: string
         }
@@ -245,7 +249,9 @@ export type Database = {
           created_by?: string
           description?: string | null
           id?: string
+          looking_for?: string | null
           name?: string
+          skills_needed?: string[] | null
           studio?: string
           updated_at?: string
         }
