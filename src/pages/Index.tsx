@@ -41,12 +41,12 @@ const Index = () => {
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // DEV MODE: Skip auth redirect
-  // useEffect(() => {
-  //   if (!loading && !user) {
-  //     navigate('/auth');
-  //   }
-  // }, [user, loading, navigate]);
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
 
   const handleOnboardingComplete = async (profileData: Omit<UserProfile, 'id'>) => {
     if (!user) return;
@@ -194,22 +194,20 @@ const Index = () => {
     );
   }
 
-  // DEV MODE: Skip user check
-  // if (!user) {
-  //   return null;
-  // }
+  if (!user) {
+    return null;
+  }
 
-  // DEV MODE: Skip profile check - go straight to main UI
-  // if (!profile) {
-  //   return <OnboardingWizard onComplete={handleOnboardingComplete} />;
-  // }
+  // Show onboarding if no profile exists
+  if (!profile) {
+    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
+  }
 
   const currentItems = activeTab === 'individuals' ? users : teams;
   const isLastCard = currentItems.length === 1;
   const hasCards = currentItems.length > 0;
 
-  // DEV MODE: Use mock profile when no real profile exists
-  const currentUserProfile: Omit<UserProfile, 'id'> = profile ? {
+  const currentUserProfile: Omit<UserProfile, 'id'> = {
     name: profile.name,
     program: profile.program,
     skills: profile.skills,
@@ -217,14 +215,6 @@ const Index = () => {
     studioPreference: profile.studioPreference,
     avatar: profile.avatar,
     linkedIn: profile.linkedIn,
-  } : {
-    name: 'Dev User',
-    program: 'MBA' as Program,
-    skills: ['Development', 'Design'],
-    bio: 'Testing in dev mode',
-    studioPreference: 'startup' as Studio,
-    avatar: '',
-    linkedIn: '',
   };
 
   return (

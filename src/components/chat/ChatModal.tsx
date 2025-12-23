@@ -21,13 +21,107 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // DEV MODE: Use mock data since we're bypassing auth
+  // Fetch conversations and matches when modal opens
   useEffect(() => {
-    if (isOpen) {
-      // For dev mode, set empty data
-      setConversations([]);
-      setMatches([]);
-    }
+    if (!isOpen || !currentUserId) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch user's conversations
+        const { data: participations } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', currentUserId);
+
+        if (participations && participations.length > 0) {
+          const conversationIds = participations.map((p) => p.conversation_id);
+          
+          const { data: convData } = await supabase
+            .from('conversations')
+            .select('*')
+            .in('id', conversationIds);
+
+          // Get other participants for each conversation
+          const conversationsWithUsers: Conversation[] = await Promise.all(
+            (convData || []).map(async (conv) => {
+              if (conv.type === 'direct') {
+                // Get other user in conversation
+                const { data: participants } = await supabase
+                  .from('conversation_participants')
+                  .select('user_id')
+                  .eq('conversation_id', conv.id)
+                  .neq('user_id', currentUserId);
+
+                const otherUserId = participants?.[0]?.user_id;
+                
+                if (otherUserId) {
+                  const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('user_id, name, avatar')
+                    .eq('user_id', otherUserId)
+                    .single();
+
+                  return {
+                    ...conv,
+                    type: conv.type as 'direct' | 'team',
+                    other_user: profile ? {
+                      id: profile.user_id,
+                      name: profile.name,
+                      avatar: profile.avatar || '',
+                    } : undefined,
+                  };
+                }
+              }
+              return { ...conv, type: conv.type as 'direct' | 'team' };
+            })
+          );
+
+          setConversations(conversationsWithUsers);
+        }
+
+        // Fetch matches where both users have swiped right
+        const { data: matchData } = await supabase
+          .from('matches')
+          .select('*')
+          .or(`user_id.eq.${currentUserId},target_user_id.eq.${currentUserId}`)
+          .eq('status', 'matched');
+
+        // Get profiles for matched users
+        const matchesWithProfiles: Match[] = await Promise.all(
+          (matchData || []).map(async (match) => {
+            const otherUserId = match.user_id === currentUserId 
+              ? match.target_user_id 
+              : match.user_id;
+            
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('user_id, name, avatar, program')
+              .eq('user_id', otherUserId)
+              .single();
+
+            return {
+              ...match,
+              status: match.status as 'pending' | 'matched' | 'rejected',
+              target_profile: profile ? {
+                id: profile.user_id,
+                name: profile.name,
+                avatar: profile.avatar || '',
+                program: profile.program,
+              } : undefined,
+            };
+          })
+        );
+
+        setMatches(matchesWithProfiles);
+      } catch (error) {
+        console.error('Error fetching chat data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, [isOpen, currentUserId]);
 
   // Subscribe to new messages when in a conversation
