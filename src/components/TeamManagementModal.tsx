@@ -55,7 +55,7 @@ export const TeamManagementModal = ({
         .from('team_members')
         .select('id, user_id, role')
         .eq('team_id', team.id)
-        .eq('status', 'active');
+        .eq('status', 'confirmed');
 
       if (membersError) throw membersError;
 
@@ -106,7 +106,7 @@ export const TeamManagementModal = ({
         .from('team_members')
         .select('user_id')
         .eq('team_id', team.id)
-        .eq('status', 'active');
+        .eq('status', 'confirmed');
 
       const memberUserIds = new Set((currentMembers || []).map(m => m.user_id));
 
@@ -148,7 +148,7 @@ export const TeamManagementModal = ({
           team_id: team.id,
           user_id: userId,
           role: 'member',
-          status: 'active',
+          status: 'confirmed',
         });
 
       if (memberError) throw memberError;
