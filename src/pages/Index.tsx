@@ -27,10 +27,54 @@ const Index = () => {
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<'individuals' | 'teams'>('individuals');
-  const [users, setUsers] = useState<UserProfile[]>(mockUsers);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [teams, setTeams] = useState<Team[]>(mockTeams);
   const [matches, setMatches] = useState<string[]>([]);
   const [history, setHistory] = useState<SwipeHistory[]>([]);
+  const [loadingProfiles, setLoadingProfiles] = useState(true);
+
+  // Fetch real profiles from database (excluding current user)
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!user) return;
+      
+      setLoadingProfiles(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .neq('user_id', user.id);
+
+        if (error) {
+          console.error('Error fetching profiles:', error);
+          toast.error('Failed to load profiles');
+          return;
+        }
+
+        // Transform database profiles to UserProfile format
+        const transformedProfiles: UserProfile[] = (data || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          program: p.program as Program,
+          skills: p.skills || [],
+          bio: p.bio || '',
+          studioPreference: p.studio_preference as Studio,
+          avatar: p.avatar || undefined,
+          linkedIn: p.linkedin || undefined,
+        }));
+
+        setUsers(transformedProfiles);
+      } catch (error) {
+        console.error('Error fetching profiles:', error);
+      } finally {
+        setLoadingProfiles(false);
+      }
+    };
+
+    if (profile) {
+      fetchProfiles();
+    }
+  }, [user, profile]);
   const [savingProfile, setSavingProfile] = useState(false);
   
   // Modal state
@@ -186,7 +230,7 @@ const Index = () => {
   );
 
   // Show loading state
-  if (loading) {
+  if (loading || (profile && loadingProfiles)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
