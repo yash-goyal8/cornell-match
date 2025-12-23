@@ -9,11 +9,14 @@ import { ProfileDetailModal } from '@/components/ProfileDetailModal';
 import { TeamDetailModal } from '@/components/TeamDetailModal';
 import { MyProfileModal } from '@/components/MyProfileModal';
 import { ChatModal } from '@/components/chat/ChatModal';
+import { CreateTeamModal } from '@/components/CreateTeamModal';
+import { TeamManagementModal } from '@/components/TeamManagementModal';
 import { UserProfile, Team, Program, Studio } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface SwipeHistory {
   type: 'user' | 'team';
@@ -198,6 +201,80 @@ const Index = () => {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+  const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
+  const [myTeam, setMyTeam] = useState<Team | null>(null);
+
+  // Check if current user has a team
+  useEffect(() => {
+    const checkUserTeam = async () => {
+      if (!user) return;
+      
+      // Check if user is a member of any team
+      const { data: membership } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (membership) {
+        // Fetch team details
+        const { data: teamData } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', membership.team_id)
+          .single();
+
+        if (teamData) {
+          // Fetch team members
+          const { data: members } = await supabase
+            .from('team_members')
+            .select('user_id')
+            .eq('team_id', teamData.id)
+            .eq('status', 'active');
+
+          const memberUserIds = (members || []).map(m => m.user_id);
+          let teamMembers: UserProfile[] = [];
+
+          if (memberUserIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('*')
+              .in('user_id', memberUserIds);
+
+            teamMembers = (profiles || []).map(p => ({
+              id: p.user_id,
+              name: p.name,
+              program: p.program as Program,
+              skills: p.skills || [],
+              bio: p.bio || '',
+              studioPreference: p.studio_preference as Studio,
+              avatar: p.avatar || '',
+              linkedIn: p.linkedin,
+            }));
+          }
+
+          setMyTeam({
+            id: teamData.id,
+            name: teamData.name,
+            description: teamData.description || '',
+            studio: teamData.studio as Studio,
+            members: teamMembers,
+            lookingFor: [],
+            skillsNeeded: [],
+            createdBy: teamData.created_by,
+          });
+        }
+      } else {
+        setMyTeam(null);
+      }
+    };
+
+    if (profile) {
+      checkUserTeam();
+    }
+  }, [user, profile]);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -267,6 +344,94 @@ const Index = () => {
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('An unexpected error occurred');
+    }
+  };
+
+  const handleCreateTeam = async (teamData: { name: string; description: string; studio: Studio }) => {
+    if (!user) return;
+
+    try {
+      // 1. Create the team
+      const { data: newTeam, error: teamError } = await supabase
+        .from('teams')
+        .insert({
+          name: teamData.name,
+          description: teamData.description,
+          studio: teamData.studio,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (teamError) throw teamError;
+
+      // 2. Add creator as admin member
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert({
+          team_id: newTeam.id,
+          user_id: user.id,
+          role: 'admin',
+          status: 'active',
+        });
+
+      if (memberError) throw memberError;
+
+      // 3. Create team conversation
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .insert({
+          type: 'team',
+          team_id: newTeam.id,
+        })
+        .select()
+        .single();
+
+      if (convError) throw convError;
+
+      // 4. Add creator to conversation participants
+      const { error: participantError } = await supabase
+        .from('conversation_participants')
+        .insert({
+          conversation_id: conversation.id,
+          user_id: user.id,
+        });
+
+      if (participantError) throw participantError;
+
+      // Update local state
+      const creatorProfile: UserProfile = {
+        id: user.id,
+        name: profile?.name || 'You',
+        program: profile?.program as Program || 'MBA',
+        skills: profile?.skills || [],
+        bio: profile?.bio || '',
+        studioPreference: profile?.studioPreference as Studio || 'startup',
+        avatar: profile?.avatar || '',
+        linkedIn: profile?.linkedIn,
+      };
+
+      const createdTeam: Team = {
+        id: newTeam.id,
+        name: newTeam.name,
+        description: newTeam.description || '',
+        studio: newTeam.studio as Studio,
+        members: [creatorProfile],
+        lookingFor: [],
+        skillsNeeded: [],
+        createdBy: user.id,
+      };
+
+      setMyTeam(createdTeam);
+      setTeams(prev => [createdTeam, ...prev]);
+
+      toast.success('Team created!', {
+        description: `You are now the admin of "${teamData.name}"`,
+      });
+    } catch (error) {
+      console.error('Error creating team:', error);
+      toast.error('Failed to create team');
+      throw error;
     }
   };
 
@@ -388,6 +553,41 @@ const Index = () => {
       />
 
       <main className="container mx-auto px-4 py-8">
+        {/* Team Status Banner */}
+        <motion.div
+          className="mb-4"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          {myTeam ? (
+            <div className="flex items-center justify-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20">
+              <span className="text-sm">
+                You're part of <strong>{myTeam.name}</strong>
+              </span>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => setIsTeamManagementOpen(true)}
+              >
+                Manage Team
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-3 p-3 rounded-xl bg-accent/50 border border-border">
+              <span className="text-sm text-muted-foreground">
+                You're not in a team yet
+              </span>
+              <Button 
+                size="sm" 
+                onClick={() => setIsCreateTeamOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Create Team
+              </Button>
+            </div>
+          )}
+        </motion.div>
+
         {/* Hero Text */}
         <motion.div
           className="text-center mb-4"
@@ -539,6 +739,25 @@ const Index = () => {
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         currentUserId={user?.id || 'dev-user'}
+      />
+
+      {/* Create Team Modal */}
+      <CreateTeamModal
+        isOpen={isCreateTeamOpen}
+        onClose={() => setIsCreateTeamOpen(false)}
+        onCreateTeam={handleCreateTeam}
+      />
+
+      {/* Team Management Modal */}
+      <TeamManagementModal
+        isOpen={isTeamManagementOpen}
+        onClose={() => setIsTeamManagementOpen(false)}
+        team={myTeam}
+        currentUserId={user?.id || ''}
+        onOpenChat={() => {
+          setIsTeamManagementOpen(false);
+          setIsChatOpen(true);
+        }}
       />
     </div>
   );
