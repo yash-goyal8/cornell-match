@@ -9,7 +9,6 @@ import { ProfileDetailModal } from '@/components/ProfileDetailModal';
 import { TeamDetailModal } from '@/components/TeamDetailModal';
 import { MyProfileModal } from '@/components/MyProfileModal';
 import { ChatModal } from '@/components/chat/ChatModal';
-import { mockUsers, mockTeams } from '@/data/mockData';
 import { UserProfile, Team, Program, Studio } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -116,47 +115,52 @@ const Index = () => {
           return;
         }
 
-        // Fetch all team members with their profiles
+        // Fetch all team members
         const { data: membersData, error: membersError } = await supabase
           .from('team_members')
-          .select(`
-            team_id,
-            user_id,
-            role,
-            profiles!team_members_user_id_fkey (
-              id,
-              name,
-              program,
-              skills,
-              bio,
-              studio_preference,
-              avatar,
-              linkedin
-            )
-          `)
+          .select('team_id, user_id, role')
           .eq('status', 'active');
 
         if (membersError) {
           console.error('Error fetching team members:', membersError);
         }
 
-        // Group members by team
-        const membersByTeam: Record<string, any[]> = {};
+        // Fetch profiles for all team members
+        const memberUserIds = (membersData || []).map(m => m.user_id);
+        let profilesMap: Record<string, any> = {};
+        
+        if (memberUserIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('user_id', memberUserIds);
+
+          if (profilesError) {
+            console.error('Error fetching member profiles:', profilesError);
+          }
+
+          (profilesData || []).forEach(p => {
+            profilesMap[p.user_id] = p;
+          });
+        }
+
+        // Group members by team with their profile data
+        const membersByTeam: Record<string, UserProfile[]> = {};
         (membersData || []).forEach(member => {
           if (!membersByTeam[member.team_id]) {
             membersByTeam[member.team_id] = [];
           }
-          if (member.profiles) {
+          const profile = profilesMap[member.user_id];
+          if (profile) {
             membersByTeam[member.team_id].push({
-              id: member.profiles.id,
-              name: member.profiles.name,
-              program: member.profiles.program as Program,
-              skills: member.profiles.skills || [],
-              bio: member.profiles.bio || '',
-              studioPreference: member.profiles.studio_preference as Studio,
-              avatar: member.profiles.avatar || undefined,
-              linkedIn: member.profiles.linkedin || undefined,
-              role: member.role,
+              id: profile.id,
+              name: profile.name,
+              program: profile.program as Program,
+              skills: profile.skills || [],
+              bio: profile.bio || '',
+              studioPreference: profile.studio_preference as Studio,
+              avatar: profile.avatar || undefined,
+              linkedIn: profile.linkedin || undefined,
             });
           }
         });
@@ -170,6 +174,7 @@ const Index = () => {
           members: membersByTeam[t.id] || [],
           lookingFor: [], // Can be added to teams table later
           skillsNeeded: [], // Can be added to teams table later
+          createdBy: t.created_by,
         }));
 
         setTeams(transformedTeams);
@@ -339,7 +344,7 @@ const Index = () => {
   );
 
   // Show loading state
-  if (loading || (profile && loadingProfiles)) {
+  if (loading || (profile && (loadingProfiles || loadingTeams))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
