@@ -47,7 +47,7 @@ const Index = () => {
         const { data: teamMembers, error: tmError } = await supabase
           .from('team_members')
           .select('user_id')
-          .eq('status', 'active');
+          .eq('status', 'confirmed');
 
         if (tmError) {
           console.error('Error fetching team members:', tmError);
@@ -122,7 +122,7 @@ const Index = () => {
         const { data: membersData, error: membersError } = await supabase
           .from('team_members')
           .select('team_id, user_id, role')
-          .eq('status', 'active');
+          .eq('status', 'confirmed');
 
         if (membersError) {
           console.error('Error fetching team members:', membersError);
@@ -215,7 +215,7 @@ const Index = () => {
         .from('team_members')
         .select('team_id')
         .eq('user_id', user.id)
-        .eq('status', 'active')
+        .eq('status', 'confirmed')
         .maybeSingle();
 
       if (membership) {
@@ -232,7 +232,7 @@ const Index = () => {
             .from('team_members')
             .select('user_id')
             .eq('team_id', teamData.id)
-            .eq('status', 'active');
+            .eq('status', 'confirmed');
 
           const memberUserIds = (members || []).map(m => m.user_id);
           let teamMembers: UserProfile[] = [];
