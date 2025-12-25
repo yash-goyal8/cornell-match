@@ -145,6 +145,7 @@ export type Database = {
           program: string
           skills: string[] | null
           studio_preference: string
+          studio_preferences: string[] | null
           updated_at: string
           user_id: string
         }
@@ -158,6 +159,7 @@ export type Database = {
           program: string
           skills?: string[] | null
           studio_preference: string
+          studio_preferences?: string[] | null
           updated_at?: string
           user_id: string
         }
@@ -171,6 +173,7 @@ export type Database = {
           program?: string
           skills?: string[] | null
           studio_preference?: string
+          studio_preferences?: string[] | null
           updated_at?: string
           user_id?: string
         }

@@ -53,6 +53,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           skills: data.skills || [],
           bio: data.bio || '',
           studioPreference: data.studio_preference,
+          studioPreferences: data.studio_preferences || [data.studio_preference],
           avatar: data.avatar || '',
           linkedIn: data.linkedin,
         } as UserProfile;

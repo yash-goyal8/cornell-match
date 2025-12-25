@@ -16,7 +16,7 @@ interface ProfileDetailModalProps {
 export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }: ProfileDetailModalProps) => {
   if (!profile) return null;
 
-  const studioData = studioInfo[profile.studioPreference];
+  const studioPrefs = profile.studioPreferences || [profile.studioPreference];
 
   return (
     <AnimatePresence>
@@ -59,9 +59,19 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }:
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
                   
-                  {/* Studio Badge */}
-                  <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-semibold ${studioData.color} text-primary-foreground`}>
-                    {studioData.name}
+                  {/* Studio Badges */}
+                  <div className="absolute top-4 left-4 flex flex-wrap gap-1.5">
+                    {studioPrefs.map((studio) => {
+                      const stData = studioInfo[studio];
+                      return (
+                        <div 
+                          key={studio}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${stData.color} text-primary-foreground`}
+                        >
+                          {stData.name}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -77,12 +87,22 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }:
                     </div>
                   </div>
 
-                  {/* Studio Preference */}
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-secondary/50">
-                    <GraduationCap className="w-5 h-5 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Interested in {studioData.name}</p>
-                      <p className="text-xs text-muted-foreground">{studioData.description}</p>
+                  {/* Studio Preferences */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Studio Interests</h3>
+                    </div>
+                    <div className="space-y-2">
+                      {studioPrefs.map((studio) => {
+                        const stData = studioInfo[studio];
+                        return (
+                          <div key={studio} className="p-3 rounded-lg bg-secondary/50">
+                            <p className="text-sm font-medium text-foreground">{stData.name}</p>
+                            <p className="text-xs text-muted-foreground">{stData.description}</p>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 

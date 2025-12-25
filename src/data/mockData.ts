@@ -8,6 +8,7 @@ export const mockUsers: UserProfile[] = [
     skills: ['Product Strategy', 'Marketing', 'Finance'],
     bio: 'Passionate about building products that matter. Previously at Google, looking to join a startup studio team.',
     studioPreference: 'startup',
+    studioPreferences: ['startup', 'bigco'],
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop',
   },
   {
@@ -17,6 +18,7 @@ export const mockUsers: UserProfile[] = [
     skills: ['Full-Stack Development', 'Machine Learning', 'Cloud Architecture'],
     bio: 'Software engineer with 5 years experience. Excited to work on impactful tech projects.',
     studioPreference: 'pitech',
+    studioPreferences: ['pitech'],
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
   },
   {
@@ -26,6 +28,7 @@ export const mockUsers: UserProfile[] = [
     skills: ['IP Law', 'Contract Negotiation', 'Regulatory Compliance'],
     bio: 'Tech lawyer specializing in IP and startup law. Ready to bring legal expertise to innovative teams.',
     studioPreference: 'bigco',
+    studioPreferences: ['bigco', 'startup'],
     avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop',
   },
   {
@@ -35,6 +38,7 @@ export const mockUsers: UserProfile[] = [
     skills: ['Data Science', 'Python', 'Statistical Analysis'],
     bio: 'Data enthusiast with a background in media analytics. Looking to apply ML to real-world problems.',
     studioPreference: 'startup',
+    studioPreferences: ['startup', 'pitech'],
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop',
   },
   {
@@ -44,6 +48,7 @@ export const mockUsers: UserProfile[] = [
     skills: ['Healthcare Operations', 'UX Research', 'Clinical Workflows'],
     bio: 'Former nurse turned health tech innovator. Bridging the gap between clinical needs and technology.',
     studioPreference: 'pitech',
+    studioPreferences: ['pitech', 'startup', 'bigco'],
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop',
   },
 ];

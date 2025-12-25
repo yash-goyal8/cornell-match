@@ -89,6 +89,7 @@ const Index = () => {
           skills: p.skills || [],
           bio: p.bio || "",
           studioPreference: p.studio_preference as Studio,
+          studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
           avatar: p.avatar || undefined,
           linkedIn: p.linkedin || undefined,
         }));
@@ -171,6 +172,7 @@ const Index = () => {
               skills: profile.skills || [],
               bio: profile.bio || "",
               studioPreference: profile.studio_preference as Studio,
+              studioPreferences: (profile.studio_preferences as Studio[]) || [profile.studio_preference as Studio],
               avatar: profile.avatar || undefined,
               linkedIn: profile.linkedin || undefined,
             });
@@ -252,6 +254,7 @@ const Index = () => {
               skills: p.skills || [],
               bio: p.bio || "",
               studioPreference: p.studio_preference as Studio,
+              studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
               avatar: p.avatar || "",
               linkedIn: p.linkedin,
             }));
@@ -297,6 +300,7 @@ const Index = () => {
         skills: profileData.skills,
         bio: profileData.bio,
         studio_preference: profileData.studioPreference,
+        studio_preferences: profileData.studioPreferences,
         avatar: profileData.avatar,
         linkedin: profileData.linkedIn,
       });
@@ -331,6 +335,7 @@ const Index = () => {
           skills: updatedProfile.skills,
           bio: updatedProfile.bio,
           studio_preference: updatedProfile.studioPreference,
+          studio_preferences: updatedProfile.studioPreferences,
           avatar: updatedProfile.avatar,
           linkedin: updatedProfile.linkedIn,
         })
@@ -413,6 +418,7 @@ const Index = () => {
         skills: profile?.skills || [],
         bio: profile?.bio || "",
         studioPreference: (profile?.studioPreference as Studio) || "startup",
+        studioPreferences: (profile?.studioPreferences as Studio[]) || [(profile?.studioPreference as Studio) || "startup"],
         avatar: profile?.avatar || "",
         linkedIn: profile?.linkedIn,
       };
@@ -534,9 +540,13 @@ const Index = () => {
       if (peopleFilters.programs.length > 0) {
         if (!peopleFilters.programs.includes(user.program)) return false;
       }
-      // Filter by studio preference
+      // Filter by studio preference (match any of user's studio preferences)
       if (peopleFilters.studios.length > 0) {
-        if (!peopleFilters.studios.includes(user.studioPreference)) return false;
+        const userStudios = user.studioPreferences || [user.studioPreference];
+        const hasMatchingStudio = peopleFilters.studios.some((studio) =>
+          userStudios.includes(studio)
+        );
+        if (!hasMatchingStudio) return false;
       }
       return true;
     });
@@ -603,6 +613,7 @@ const Index = () => {
     skills: profile.skills,
     bio: profile.bio,
     studioPreference: profile.studioPreference,
+    studioPreferences: profile.studioPreferences || [profile.studioPreference],
     avatar: profile.avatar,
     linkedIn: profile.linkedIn,
   };
@@ -843,6 +854,7 @@ const Index = () => {
                 skills: p.skills || [],
                 bio: p.bio || "",
                 studioPreference: p.studio_preference as Studio,
+                studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
                 avatar: p.avatar || undefined,
                 linkedIn: p.linkedin || undefined,
               }));

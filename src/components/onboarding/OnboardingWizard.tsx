@@ -26,7 +26,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
     skills: [] as string[],
     bio: '',
     linkedIn: '',
-    studioPreference: '' as Studio | '',
+    studioPreferences: [] as Studio[],
   });
 
   const nextStep = () => {
@@ -39,18 +39,19 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
     setStep((prev) => Math.max(prev - 1, 0));
   };
 
-  const updateFormData = (field: string, value: string | string[]) => {
+  const updateFormData = (field: string, value: string | string[] | Studio[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleComplete = () => {
-    if (formData.name && formData.program && formData.studioPreference) {
+    if (formData.name && formData.program && formData.studioPreferences.length > 0) {
       onComplete({
         name: formData.name,
         program: formData.program as Program,
         skills: formData.skills,
         bio: formData.bio,
-        studioPreference: formData.studioPreference as Studio,
+        studioPreference: formData.studioPreferences[0], // Primary preference
+        studioPreferences: formData.studioPreferences,
         avatar: formData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop',
         linkedIn: formData.linkedIn || undefined,
       });
@@ -126,8 +127,8 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       case 6:
         return (
           <StudioStep
-            value={formData.studioPreference}
-            onChange={(value) => updateFormData('studioPreference', value)}
+            value={formData.studioPreferences}
+            onChange={(value) => updateFormData('studioPreferences', value)}
             onComplete={handleComplete}
             onBack={prevStep}
           />

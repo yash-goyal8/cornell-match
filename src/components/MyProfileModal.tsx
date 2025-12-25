@@ -39,6 +39,7 @@ export const MyProfileModal = ({ profile, isOpen, onClose, onSave }: MyProfileMo
 
   if (!profile) return null;
 
+  const studioPrefs = profile.studioPreferences || [profile.studioPreference];
   const studioData = studioInfo[profile.studioPreference];
 
   const handleStartEdit = () => {
@@ -176,9 +177,19 @@ export const MyProfileModal = ({ profile, isOpen, onClose, onSave }: MyProfileMo
                     </label>
                   )}
                   
-                  {/* Studio Badge */}
-                  <div className={`absolute top-4 left-4 px-3 py-1.5 rounded-full text-xs font-semibold ${studioData.color} text-primary-foreground`}>
-                    {studioData.name}
+                  {/* Studio Badges */}
+                  <div className="absolute top-4 left-4 flex flex-wrap gap-1.5">
+                    {studioPrefs.map((studio) => {
+                      const stData = studioInfo[studio];
+                      return (
+                        <div 
+                          key={studio}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${stData.color} text-primary-foreground`}
+                        >
+                          {stData.name}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -216,19 +227,45 @@ export const MyProfileModal = ({ profile, isOpen, onClose, onSave }: MyProfileMo
                     )}
                   </div>
 
-                  {/* Studio Preference (editable) */}
+                  {/* Studio Preferences (editable) */}
                   {isEditing && (
                     <div className="space-y-2">
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Studio Preference</h3>
-                      <select
-                        value={editedProfile?.studioPreference || ''}
-                        onChange={(e) => setEditedProfile(prev => prev ? { ...prev, studioPreference: e.target.value as Studio } : null)}
-                        className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-foreground"
-                      >
-                        {studios.map((s) => (
-                          <option key={s.value} value={s.value}>{s.label}</option>
-                        ))}
-                      </select>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Studio Preferences</h3>
+                      <p className="text-xs text-muted-foreground mb-2">Select one or more studios</p>
+                      <div className="flex flex-wrap gap-2">
+                        {studios.map((s) => {
+                          const isSelected = editedProfile?.studioPreferences?.includes(s.value) || 
+                            (editedProfile?.studioPreference === s.value && !editedProfile?.studioPreferences?.length);
+                          return (
+                            <button
+                              key={s.value}
+                              onClick={() => {
+                                if (!editedProfile) return;
+                                const currentPrefs = editedProfile.studioPreferences || [editedProfile.studioPreference];
+                                let newPrefs: Studio[];
+                                if (currentPrefs.includes(s.value)) {
+                                  newPrefs = currentPrefs.filter(p => p !== s.value);
+                                  if (newPrefs.length === 0) newPrefs = [s.value]; // Keep at least one
+                                } else {
+                                  newPrefs = [...currentPrefs, s.value];
+                                }
+                                setEditedProfile({
+                                  ...editedProfile,
+                                  studioPreferences: newPrefs,
+                                  studioPreference: newPrefs[0], // Primary is first
+                                });
+                              }}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                                isSelected 
+                                  ? 'bg-primary text-primary-foreground' 
+                                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                              }`}
+                            >
+                              {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
