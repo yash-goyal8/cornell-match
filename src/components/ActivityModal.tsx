@@ -229,8 +229,7 @@ export const ActivityModal = ({
         profile={selectedProfile}
         isOpen={!!selectedProfile}
         onClose={() => setSelectedProfile(null)}
-        onLike={() => setSelectedProfile(null)}
-        onPass={() => setSelectedProfile(null)}
+        showActions={false}
       />
 
       {/* Team Detail Modal */}
