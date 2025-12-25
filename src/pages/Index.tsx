@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Header } from "@/components/Header";
@@ -11,6 +11,7 @@ import { MyProfileModal } from "@/components/MyProfileModal";
 import { ChatModal } from "@/components/chat/ChatModal";
 import { CreateTeamModal } from "@/components/CreateTeamModal";
 import { TeamManagementModal } from "@/components/TeamManagementModal";
+import { FilterPanel, PeopleFilters, TeamFilters } from "@/components/FilterPanel";
 import { UserProfile, Team, Program, Studio } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,19 @@ const Index = () => {
   const [history, setHistory] = useState<SwipeHistory[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
+
+  // Filter state
+  const [peopleFilters, setPeopleFilters] = useState<PeopleFilters>({
+    skills: [],
+    programs: [],
+    studios: [],
+  });
+  const [teamFilters, setTeamFilters] = useState<TeamFilters>({
+    skillsNeeded: [],
+    lookingFor: [],
+    studios: [],
+    teamSize: null,
+  });
 
   // Fetch profiles of users NOT in any team (excluding current user)
   useEffect(() => {
@@ -506,6 +520,61 @@ const Index = () => {
     ((activeTab === "individuals" && history[history.length - 1]?.type === "user") ||
       (activeTab === "teams" && history[history.length - 1]?.type === "team"));
 
+  // Filtered users
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      // Filter by skills
+      if (peopleFilters.skills.length > 0) {
+        const hasMatchingSkill = peopleFilters.skills.some((skill) =>
+          user.skills.some((s) => s.toLowerCase().includes(skill.toLowerCase()))
+        );
+        if (!hasMatchingSkill) return false;
+      }
+      // Filter by program
+      if (peopleFilters.programs.length > 0) {
+        if (!peopleFilters.programs.includes(user.program)) return false;
+      }
+      // Filter by studio preference
+      if (peopleFilters.studios.length > 0) {
+        if (!peopleFilters.studios.includes(user.studioPreference)) return false;
+      }
+      return true;
+    });
+  }, [users, peopleFilters]);
+
+  // Filtered teams
+  const filteredTeams = useMemo(() => {
+    return teams.filter((team) => {
+      // Filter by skills needed
+      if (teamFilters.skillsNeeded.length > 0) {
+        const hasMatchingSkill = teamFilters.skillsNeeded.some((skill) =>
+          team.skillsNeeded.some((s) => s.toLowerCase().includes(skill.toLowerCase()))
+        );
+        if (!hasMatchingSkill) return false;
+      }
+      // Filter by looking for (programs)
+      if (teamFilters.lookingFor.length > 0) {
+        const hasMatchingProgram = teamFilters.lookingFor.some((program) =>
+          team.lookingFor.includes(program)
+        );
+        if (!hasMatchingProgram) return false;
+      }
+      // Filter by studio
+      if (teamFilters.studios.length > 0) {
+        if (!teamFilters.studios.includes(team.studio)) return false;
+      }
+      // Filter by team size
+      if (teamFilters.teamSize !== null) {
+        if (teamFilters.teamSize === 4) {
+          if (team.members.length < 4) return false;
+        } else {
+          if (team.members.length !== teamFilters.teamSize) return false;
+        }
+      }
+      return true;
+    });
+  }, [teams, teamFilters]);
+
   // Show loading state
   if (loading || (profile && (loadingProfiles || loadingTeams))) {
     return (
@@ -524,7 +593,7 @@ const Index = () => {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
 
-  const currentItems = activeTab === "individuals" ? users : teams;
+  const currentItems = activeTab === "individuals" ? filteredUsers : filteredTeams;
   const isLastCard = currentItems.length === 1;
   const hasCards = currentItems.length > 0;
 
@@ -580,10 +649,25 @@ const Index = () => {
           </h2>
           <p className="text-muted-foreground">
             {activeTab === "individuals"
-              ? `${users.length} ${users.length === 1 ? "person" : "people"} to discover`
-              : `${teams.length} ${teams.length === 1 ? "team" : "teams"} to explore`}
+              ? `${filteredUsers.length} ${filteredUsers.length === 1 ? "person" : "people"} to discover${filteredUsers.length !== users.length ? ` (${users.length} total)` : ""}`
+              : `${filteredTeams.length} ${filteredTeams.length === 1 ? "team" : "teams"} to explore${filteredTeams.length !== teams.length ? ` (${teams.length} total)` : ""}`}
           </p>
         </motion.div>
+
+        {/* Filter Panel */}
+        {activeTab === "individuals" ? (
+          <FilterPanel
+            type="people"
+            peopleFilters={peopleFilters}
+            onPeopleFiltersChange={setPeopleFilters}
+          />
+        ) : (
+          <FilterPanel
+            type="teams"
+            teamFilters={teamFilters}
+            onTeamFiltersChange={setTeamFilters}
+          />
+        )}
 
         {/* Swipe Instructions */}
         {hasCards && (
@@ -608,7 +692,7 @@ const Index = () => {
             <AnimatePresence mode="popLayout">
               {activeTab === "individuals" ? (
                 hasCards ? (
-                  users
+                  filteredUsers
                     .slice(0, 2)
                     .map((user, index) => (
                       <SwipeableCard
@@ -626,14 +710,16 @@ const Index = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center py-12"
                   >
-                    <p className="text-muted-foreground mb-4">You've seen everyone!</p>
+                    <p className="text-muted-foreground mb-4">
+                      {users.length > 0 ? "No matches for current filters" : "You've seen everyone!"}
+                    </p>
                     {canUndo && (
                       <p className="text-sm text-muted-foreground">Use the undo button to go back through profiles</p>
                     )}
                   </motion.div>
                 )
               ) : hasCards ? (
-                teams
+                filteredTeams
                   .slice(0, 2)
                   .map((team, index) => (
                     <SwipeableTeamCard
@@ -651,7 +737,9 @@ const Index = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   className="text-center py-12"
                 >
-                  <p className="text-muted-foreground mb-4">You've seen all teams!</p>
+                  <p className="text-muted-foreground mb-4">
+                    {teams.length > 0 ? "No matches for current filters" : "You've seen all teams!"}
+                  </p>
                   {canUndo && (
                     <p className="text-sm text-muted-foreground">Use the undo button to go back through teams</p>
                   )}
