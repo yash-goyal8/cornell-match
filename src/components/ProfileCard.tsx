@@ -21,7 +21,7 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
       exit={{ scale: 0.95, opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="relative rounded-2xl overflow-hidden shadow-card glass">
+      <div className="relative rounded-2xl overflow-hidden shadow-card glass min-h-[420px] sm:min-h-[480px]">
         {/* Image Section */}
         <div className="relative h-48 sm:h-64 overflow-hidden">
           <img

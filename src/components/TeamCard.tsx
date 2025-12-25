@@ -20,7 +20,7 @@ export const TeamCard = ({ team }: TeamCardProps) => {
       exit={{ scale: 0.95, opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="rounded-2xl overflow-hidden shadow-card glass">
+      <div className="rounded-2xl overflow-hidden shadow-card glass min-h-[420px] sm:min-h-[480px]">
         {/* Header */}
         <div className="p-4 sm:p-5 gradient-card border-b border-border/50">
           <div className="flex items-start justify-between mb-3">
