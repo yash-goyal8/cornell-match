@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RotateCcw, Heart, X, Users, User } from 'lucide-react';
 import { UserProfile, Team } from '@/types';
+import { ProfileDetailModal } from './ProfileDetailModal';
+import { TeamDetailModal } from './TeamDetailModal';
 
 interface SwipeHistory {
   type: 'user' | 'team';
@@ -28,6 +31,9 @@ export const ActivityModal = ({
   onUndo,
   activeTabContext,
 }: ActivityModalProps) => {
+  const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  
   const peopleHistory = history.filter((h) => h.type === 'user');
   const teamHistory = history.filter((h) => h.type === 'team');
 
@@ -40,7 +46,10 @@ export const ActivityModal = ({
         key={`person-${index}`}
         className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/50"
       >
-        <div className="flex items-center gap-3">
+        <div 
+          className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity flex-1"
+          onClick={() => setSelectedProfile(profile)}
+        >
           <div className="relative">
             <Avatar className="w-12 h-12">
               <AvatarImage src={profile.avatar} alt={profile.name} />
@@ -93,7 +102,10 @@ export const ActivityModal = ({
         key={`team-${index}`}
         className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/50"
       >
-        <div className="flex items-center gap-3">
+        <div 
+          className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity flex-1"
+          onClick={() => setSelectedTeam(team)}
+        >
           <div className="relative">
             <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
               <Users className="w-6 h-6 text-primary" />
@@ -137,65 +149,85 @@ export const ActivityModal = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Activity</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Activity</DialogTitle>
+          </DialogHeader>
 
-        <Tabs defaultValue={activeTabContext === 'individuals' ? 'people' : 'teams'}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="people" className="gap-2">
-              <User className="w-4 h-4" />
-              People ({peopleHistory.length})
-            </TabsTrigger>
-            <TabsTrigger value="teams" className="gap-2">
-              <Users className="w-4 h-4" />
-              Teams ({teamHistory.length})
-            </TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue={activeTabContext === 'individuals' ? 'people' : 'teams'}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="people" className="gap-2">
+                <User className="w-4 h-4" />
+                People ({peopleHistory.length})
+              </TabsTrigger>
+              <TabsTrigger value="teams" className="gap-2">
+                <Users className="w-4 h-4" />
+                Teams ({teamHistory.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="people" className="mt-4">
-            <ScrollArea className="h-[400px] pr-4">
-              {peopleHistory.length > 0 ? (
-                <div className="space-y-2">
-                  {[...peopleHistory].reverse().map((item, index) =>
-                    renderPersonItem(item, index)
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                  <User className="w-12 h-12 text-muted-foreground/50 mb-3" />
-                  <p className="text-muted-foreground">No activity yet</p>
-                  <p className="text-xs text-muted-foreground/70">
-                    Start swiping to see your history here
-                  </p>
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
+            <TabsContent value="people" className="mt-4">
+              <ScrollArea className="h-[400px] pr-4">
+                {peopleHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {[...peopleHistory].reverse().map((item, index) =>
+                      renderPersonItem(item, index)
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <User className="w-12 h-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">No activity yet</p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Start swiping to see your history here
+                    </p>
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
 
-          <TabsContent value="teams" className="mt-4">
-            <ScrollArea className="h-[400px] pr-4">
-              {teamHistory.length > 0 ? (
-                <div className="space-y-2">
-                  {[...teamHistory].reverse().map((item, index) =>
-                    renderTeamItem(item, index)
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                  <Users className="w-12 h-12 text-muted-foreground/50 mb-3" />
-                  <p className="text-muted-foreground">No activity yet</p>
-                  <p className="text-xs text-muted-foreground/70">
-                    Start swiping teams to see your history here
-                  </p>
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+            <TabsContent value="teams" className="mt-4">
+              <ScrollArea className="h-[400px] pr-4">
+                {teamHistory.length > 0 ? (
+                  <div className="space-y-2">
+                    {[...teamHistory].reverse().map((item, index) =>
+                      renderTeamItem(item, index)
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <Users className="w-12 h-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">No activity yet</p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Start swiping teams to see your history here
+                    </p>
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/* Profile Detail Modal */}
+      <ProfileDetailModal
+        profile={selectedProfile}
+        isOpen={!!selectedProfile}
+        onClose={() => setSelectedProfile(null)}
+        onLike={() => setSelectedProfile(null)}
+        onPass={() => setSelectedProfile(null)}
+      />
+
+      {/* Team Detail Modal */}
+      <TeamDetailModal
+        team={selectedTeam}
+        isOpen={!!selectedTeam}
+        onClose={() => setSelectedTeam(null)}
+        onJoin={() => setSelectedTeam(null)}
+        onPass={() => setSelectedTeam(null)}
+      />
+    </>
   );
 };
