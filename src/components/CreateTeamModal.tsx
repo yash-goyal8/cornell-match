@@ -50,6 +50,13 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
   const [skillsNeeded, setSkillsNeeded] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
+  const getWordCount = (text: string) => {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  const descriptionWordCount = getWordCount(description);
+  const isDescriptionValid = descriptionWordCount >= 30;
+
   const toggleSkill = (skill: string) => {
     setSkillsNeeded(prev => 
       prev.includes(skill) 
@@ -60,7 +67,7 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !isDescriptionValid) return;
 
     setIsCreating(true);
     try {
@@ -112,15 +119,22 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="team-description">Description</Label>
+            <Label htmlFor="team-description">Description *</Label>
             <Textarea
               id="team-description"
-              placeholder="What's your team about? What are you building?"
+              placeholder="What's your team about? What are you building? (minimum 30 words)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              maxLength={300}
-              rows={2}
+              maxLength={500}
+              rows={3}
+              className={description.length > 0 && !isDescriptionValid ? "border-destructive" : ""}
             />
+            <div className="flex justify-between text-xs">
+              <span className={descriptionWordCount < 30 ? "text-destructive" : "text-muted-foreground"}>
+                {descriptionWordCount}/30 words minimum
+              </span>
+              <span className="text-muted-foreground">{description.length}/500 characters</span>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -179,7 +193,7 @@ export const CreateTeamModal = ({ isOpen, onClose, onCreateTeam }: CreateTeamMod
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" disabled={!name.trim() || isCreating} className="flex-1">
+            <Button type="submit" disabled={!name.trim() || !isDescriptionValid || isCreating} className="flex-1">
               {isCreating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
