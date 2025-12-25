@@ -191,7 +191,9 @@ export const FilterPanel = ({
                       <Badge
                         key={skill}
                         variant={isSelected ? "default" : "outline"}
-                        className="cursor-pointer text-xs transition-all hover:scale-105"
+                        className={`cursor-pointer text-xs transition-all hover:scale-105 ${
+                          !isSelected ? "hover:bg-orange-100 hover:border-orange-300 hover:text-orange-700" : ""
+                        }`}
                         onClick={() => toggleSkill(skill)}
                       >
                         {skill}
@@ -217,7 +219,7 @@ export const FilterPanel = ({
                         key={program}
                         variant={isSelected ? "default" : "outline"}
                         className={`cursor-pointer text-xs transition-all hover:scale-105 ${
-                          isSelected ? programColors[program] + " text-white border-transparent" : ""
+                          isSelected ? programColors[program] + " text-white border-transparent" : "hover:bg-orange-100 hover:border-orange-300 hover:text-orange-700"
                         }`}
                         onClick={() => toggleProgram(program)}
                       >
@@ -243,7 +245,7 @@ export const FilterPanel = ({
                         key={studio}
                         variant={isSelected ? "default" : "outline"}
                         className={`cursor-pointer text-xs transition-all hover:scale-105 ${
-                          isSelected ? studioData.color + " text-white border-transparent" : ""
+                          isSelected ? studioData.color + " text-white border-transparent" : "hover:bg-orange-100 hover:border-orange-300 hover:text-orange-700"
                         }`}
                         onClick={() => toggleStudio(studio)}
                       >
@@ -269,7 +271,9 @@ export const FilterPanel = ({
                       <Badge
                         key={option.label}
                         variant={teamFilters?.teamSize === option.value ? "default" : "outline"}
-                        className="cursor-pointer text-xs transition-all hover:scale-105"
+                        className={`cursor-pointer text-xs transition-all hover:scale-105 ${
+                          teamFilters?.teamSize !== option.value ? "hover:bg-orange-100 hover:border-orange-300 hover:text-orange-700" : ""
+                        }`}
                         onClick={() => setTeamSize(option.value)}
                       >
                         {option.label}
