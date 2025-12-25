@@ -9,11 +9,12 @@ interface ProfileDetailModalProps {
   profile: UserProfile | null;
   isOpen: boolean;
   onClose: () => void;
-  onLike: () => void;
-  onPass: () => void;
+  onLike?: () => void;
+  onPass?: () => void;
+  showActions?: boolean;
 }
 
-export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }: ProfileDetailModalProps) => {
+export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass, showActions = true }: ProfileDetailModalProps) => {
   if (!profile) return null;
 
   const studioPrefs = profile.studioPreferences || [profile.studioPreference];
@@ -43,7 +44,10 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }:
             {/* Close button - outside the overflow container */}
             <button
               type="button"
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
               className="absolute top-4 right-4 z-[70] w-10 h-10 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-background transition-colors shadow-lg"
             >
               <X className="w-5 h-5 text-foreground" />
@@ -148,24 +152,26 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }:
               </div>
 
               {/* Action buttons */}
-              <div className="p-4 border-t border-border flex gap-3">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => { onPass(); onClose(); }}
-                  className="flex-1"
-                >
-                  <X className="w-5 h-5 mr-2" />
-                  Pass
-                </Button>
-                <Button
-                  size="lg"
-                  onClick={() => { onLike(); onClose(); }}
-                  className="flex-1"
-                >
-                  Like
-                </Button>
-              </div>
+              {showActions && onLike && onPass && (
+                <div className="p-4 border-t border-border flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => { onPass(); onClose(); }}
+                    className="flex-1"
+                  >
+                    <X className="w-5 h-5 mr-2" />
+                    Pass
+                  </Button>
+                  <Button
+                    size="lg"
+                    onClick={() => { onLike(); onClose(); }}
+                    className="flex-1"
+                  >
+                    Like
+                  </Button>
+                </div>
+              )}
             </div>
           </motion.div>
         </>
