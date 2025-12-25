@@ -1,34 +1,34 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Header } from '@/components/Header';
-import { SwipeableCard } from '@/components/SwipeableCard';
-import { SwipeableTeamCard } from '@/components/SwipeableTeamCard';
-import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
-import { ProfileDetailModal } from '@/components/ProfileDetailModal';
-import { TeamDetailModal } from '@/components/TeamDetailModal';
-import { MyProfileModal } from '@/components/MyProfileModal';
-import { ChatModal } from '@/components/chat/ChatModal';
-import { CreateTeamModal } from '@/components/CreateTeamModal';
-import { TeamManagementModal } from '@/components/TeamManagementModal';
-import { UserProfile, Team, Program, Studio } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { Loader2, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { Header } from "@/components/Header";
+import { SwipeableCard } from "@/components/SwipeableCard";
+import { SwipeableTeamCard } from "@/components/SwipeableTeamCard";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { ProfileDetailModal } from "@/components/ProfileDetailModal";
+import { TeamDetailModal } from "@/components/TeamDetailModal";
+import { MyProfileModal } from "@/components/MyProfileModal";
+import { ChatModal } from "@/components/chat/ChatModal";
+import { CreateTeamModal } from "@/components/CreateTeamModal";
+import { TeamManagementModal } from "@/components/TeamManagementModal";
+import { UserProfile, Team, Program, Studio } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Loader2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface SwipeHistory {
-  type: 'user' | 'team';
+  type: "user" | "team";
   item: UserProfile | Team;
-  direction: 'left' | 'right';
+  direction: "left" | "right";
 }
 
 const Index = () => {
   const { user, profile, loading, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
-  
-  const [activeTab, setActiveTab] = useState<'individuals' | 'teams'>('individuals');
+
+  const [activeTab, setActiveTab] = useState<"individuals" | "teams">("individuals");
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<string[]>([]);
@@ -40,35 +40,32 @@ const Index = () => {
   useEffect(() => {
     const fetchProfiles = async () => {
       if (!user) return;
-      
+
       setLoadingProfiles(true);
       try {
         // First get all user_ids who are active team members
         const { data: teamMembers, error: tmError } = await supabase
-          .from('team_members')
-          .select('user_id')
-          .eq('status', 'confirmed');
+          .from("team_members")
+          .select("user_id")
+          .eq("status", "confirmed");
 
         if (tmError) {
-          console.error('Error fetching team members:', tmError);
+          console.error("Error fetching team members:", tmError);
         }
 
-        const usersInTeams = new Set((teamMembers || []).map(tm => tm.user_id));
+        const usersInTeams = new Set((teamMembers || []).map((tm) => tm.user_id));
 
         // Fetch all profiles except current user
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .neq('user_id', user.id);
+        const { data, error } = await supabase.from("profiles").select("*").neq("user_id", user.id);
 
         if (error) {
-          console.error('Error fetching profiles:', error);
-          toast.error('Failed to load profiles');
+          console.error("Error fetching profiles:", error);
+          toast.error("Failed to load profiles");
           return;
         }
 
         // Filter out users who are already in a team
-        const availableProfiles = (data || []).filter(p => !usersInTeams.has(p.user_id));
+        const availableProfiles = (data || []).filter((p) => !usersInTeams.has(p.user_id));
 
         // Transform database profiles to UserProfile format
         const transformedProfiles: UserProfile[] = availableProfiles.map((p) => ({
@@ -76,7 +73,7 @@ const Index = () => {
           name: p.name,
           program: p.program as Program,
           skills: p.skills || [],
-          bio: p.bio || '',
+          bio: p.bio || "",
           studioPreference: p.studio_preference as Studio,
           avatar: p.avatar || undefined,
           linkedIn: p.linkedin || undefined,
@@ -84,7 +81,7 @@ const Index = () => {
 
         setUsers(transformedProfiles);
       } catch (error) {
-        console.error('Error fetching profiles:', error);
+        console.error("Error fetching profiles:", error);
       } finally {
         setLoadingProfiles(false);
       }
@@ -99,17 +96,15 @@ const Index = () => {
   useEffect(() => {
     const fetchTeams = async () => {
       if (!user) return;
-      
+
       setLoadingTeams(true);
       try {
         // Fetch all teams
-        const { data: teamsData, error: teamsError } = await supabase
-          .from('teams')
-          .select('*');
+        const { data: teamsData, error: teamsError } = await supabase.from("teams").select("*");
 
         if (teamsError) {
-          console.error('Error fetching teams:', teamsError);
-          toast.error('Failed to load teams');
+          console.error("Error fetching teams:", teamsError);
+          toast.error("Failed to load teams");
           return;
         }
 
@@ -120,36 +115,36 @@ const Index = () => {
 
         // Fetch all team members
         const { data: membersData, error: membersError } = await supabase
-          .from('team_members')
-          .select('team_id, user_id, role')
-          .eq('status', 'confirmed');
+          .from("team_members")
+          .select("team_id, user_id, role")
+          .eq("status", "confirmed");
 
         if (membersError) {
-          console.error('Error fetching team members:', membersError);
+          console.error("Error fetching team members:", membersError);
         }
 
         // Fetch profiles for all team members
-        const memberUserIds = (membersData || []).map(m => m.user_id);
+        const memberUserIds = (membersData || []).map((m) => m.user_id);
         let profilesMap: Record<string, any> = {};
-        
+
         if (memberUserIds.length > 0) {
           const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('*')
-            .in('user_id', memberUserIds);
+            .from("profiles")
+            .select("*")
+            .in("user_id", memberUserIds);
 
           if (profilesError) {
-            console.error('Error fetching member profiles:', profilesError);
+            console.error("Error fetching member profiles:", profilesError);
           }
 
-          (profilesData || []).forEach(p => {
+          (profilesData || []).forEach((p) => {
             profilesMap[p.user_id] = p;
           });
         }
 
         // Group members by team with their profile data
         const membersByTeam: Record<string, UserProfile[]> = {};
-        (membersData || []).forEach(member => {
+        (membersData || []).forEach((member) => {
           if (!membersByTeam[member.team_id]) {
             membersByTeam[member.team_id] = [];
           }
@@ -160,7 +155,7 @@ const Index = () => {
               name: profile.name,
               program: profile.program as Program,
               skills: profile.skills || [],
-              bio: profile.bio || '',
+              bio: profile.bio || "",
               studioPreference: profile.studio_preference as Studio,
               avatar: profile.avatar || undefined,
               linkedIn: profile.linkedin || undefined,
@@ -172,7 +167,7 @@ const Index = () => {
         const transformedTeams: Team[] = teamsData.map((t) => ({
           id: t.id,
           name: t.name,
-          description: t.description || '',
+          description: t.description || "",
           studio: t.studio as Studio,
           members: membersByTeam[t.id] || [],
           lookingFor: [], // Can be added to teams table later
@@ -182,7 +177,7 @@ const Index = () => {
 
         setTeams(transformedTeams);
       } catch (error) {
-        console.error('Error fetching teams:', error);
+        console.error("Error fetching teams:", error);
       } finally {
         setLoadingTeams(false);
       }
@@ -193,7 +188,7 @@ const Index = () => {
     }
   }, [user, profile]);
   const [savingProfile, setSavingProfile] = useState(false);
-  
+
   // Modal state
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -209,48 +204,41 @@ const Index = () => {
   useEffect(() => {
     const checkUserTeam = async () => {
       if (!user) return;
-      
+
       // Check if user is a member of any team
       const { data: membership } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', user.id)
-        .eq('status', 'confirmed')
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", user.id)
+        .eq("status", "confirmed")
         .maybeSingle();
 
       if (membership) {
         // Fetch team details
-        const { data: teamData } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('id', membership.team_id)
-          .single();
+        const { data: teamData } = await supabase.from("teams").select("*").eq("id", membership.team_id).single();
 
         if (teamData) {
           // Fetch team members
           const { data: members } = await supabase
-            .from('team_members')
-            .select('user_id')
-            .eq('team_id', teamData.id)
-            .eq('status', 'confirmed');
+            .from("team_members")
+            .select("user_id")
+            .eq("team_id", teamData.id)
+            .eq("status", "confirmed");
 
-          const memberUserIds = (members || []).map(m => m.user_id);
+          const memberUserIds = (members || []).map((m) => m.user_id);
           let teamMembers: UserProfile[] = [];
 
           if (memberUserIds.length > 0) {
-            const { data: profiles } = await supabase
-              .from('profiles')
-              .select('*')
-              .in('user_id', memberUserIds);
+            const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", memberUserIds);
 
-            teamMembers = (profiles || []).map(p => ({
+            teamMembers = (profiles || []).map((p) => ({
               id: p.user_id,
               name: p.name,
               program: p.program as Program,
               skills: p.skills || [],
-              bio: p.bio || '',
+              bio: p.bio || "",
               studioPreference: p.studio_preference as Studio,
-              avatar: p.avatar || '',
+              avatar: p.avatar || "",
               linkedIn: p.linkedin,
             }));
           }
@@ -258,7 +246,7 @@ const Index = () => {
           setMyTeam({
             id: teamData.id,
             name: teamData.name,
-            description: teamData.description || '',
+            description: teamData.description || "",
             studio: teamData.studio as Studio,
             members: teamMembers,
             lookingFor: [],
@@ -279,16 +267,16 @@ const Index = () => {
   // Redirect to auth if not logged in
   useEffect(() => {
     if (!loading && !user) {
-      navigate('/auth');
+      navigate("/auth");
     }
   }, [user, loading, navigate]);
 
-  const handleOnboardingComplete = async (profileData: Omit<UserProfile, 'id'>) => {
+  const handleOnboardingComplete = async (profileData: Omit<UserProfile, "id">) => {
     if (!user) return;
-    
+
     setSavingProfile(true);
     try {
-      const { error } = await supabase.from('profiles').insert({
+      const { error } = await supabase.from("profiles").insert({
         user_id: user.id,
         name: profileData.name,
         program: profileData.program,
@@ -300,8 +288,8 @@ const Index = () => {
       });
 
       if (error) {
-        console.error('Error saving profile:', error);
-        toast.error('Failed to save profile. Please try again.');
+        console.error("Error saving profile:", error);
+        toast.error("Failed to save profile. Please try again.");
         return;
       }
 
@@ -310,19 +298,19 @@ const Index = () => {
         description: "Your profile is ready. Start swiping to find teammates!",
       });
     } catch (error) {
-      console.error('Error saving profile:', error);
-      toast.error('An unexpected error occurred');
+      console.error("Error saving profile:", error);
+      toast.error("An unexpected error occurred");
     } finally {
       setSavingProfile(false);
     }
   };
 
-  const handleProfileUpdate = async (updatedProfile: Omit<UserProfile, 'id'>) => {
+  const handleProfileUpdate = async (updatedProfile: Omit<UserProfile, "id">) => {
     if (!user) return;
-    
+
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
           name: updatedProfile.name,
           program: updatedProfile.program,
@@ -332,24 +320,24 @@ const Index = () => {
           avatar: updatedProfile.avatar,
           linkedin: updatedProfile.linkedIn,
         })
-        .eq('user_id', user.id);
+        .eq("user_id", user.id);
 
       if (error) {
-        console.error('Error updating profile:', error);
-        toast.error('Failed to update profile');
+        console.error("Error updating profile:", error);
+        toast.error("Failed to update profile");
         return;
       }
 
       await refreshProfile();
     } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('An unexpected error occurred');
+      console.error("Error updating profile:", error);
+      toast.error("An unexpected error occurred");
     }
   };
 
-  const handleCreateTeam = async (teamData: { 
-    name: string; 
-    description: string; 
+  const handleCreateTeam = async (teamData: {
+    name: string;
+    description: string;
     studio: Studio;
     lookingFor: string;
     skillsNeeded: string[];
@@ -359,7 +347,7 @@ const Index = () => {
     try {
       // 1. Create the team
       const { data: newTeam, error: teamError } = await supabase
-        .from('teams')
+        .from("teams")
         .insert({
           name: teamData.name,
           description: teamData.description,
@@ -374,22 +362,20 @@ const Index = () => {
       if (teamError) throw teamError;
 
       // 2. Add creator as owner member
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert({
-          team_id: newTeam.id,
-          user_id: user.id,
-          role: 'owner',
-          status: 'confirmed',
-        });
+      const { error: memberError } = await supabase.from("team_members").insert({
+        team_id: newTeam.id,
+        user_id: user.id,
+        role: "owner",
+        status: "confirmed",
+      });
 
       if (memberError) throw memberError;
 
       // 3. Create team conversation
       const { data: conversation, error: convError } = await supabase
-        .from('conversations')
+        .from("conversations")
         .insert({
-          type: 'team',
+          type: "team",
           team_id: newTeam.id,
         })
         .select()
@@ -398,31 +384,29 @@ const Index = () => {
       if (convError) throw convError;
 
       // 4. Add creator to conversation participants
-      const { error: participantError } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversation.id,
-          user_id: user.id,
-        });
+      const { error: participantError } = await supabase.from("conversation_participants").insert({
+        conversation_id: conversation.id,
+        user_id: user.id,
+      });
 
       if (participantError) throw participantError;
 
       // Update local state
       const creatorProfile: UserProfile = {
         id: user.id,
-        name: profile?.name || 'You',
-        program: profile?.program as Program || 'MBA',
+        name: profile?.name || "You",
+        program: (profile?.program as Program) || "MBA",
         skills: profile?.skills || [],
-        bio: profile?.bio || '',
-        studioPreference: profile?.studioPreference as Studio || 'startup',
-        avatar: profile?.avatar || '',
+        bio: profile?.bio || "",
+        studioPreference: (profile?.studioPreference as Studio) || "startup",
+        avatar: profile?.avatar || "",
         linkedIn: profile?.linkedIn,
       };
 
       const createdTeam: Team = {
         id: newTeam.id,
         name: newTeam.name,
-        description: newTeam.description || '',
+        description: newTeam.description || "",
         studio: newTeam.studio as Studio,
         members: [creatorProfile],
         lookingFor: [],
@@ -431,73 +415,79 @@ const Index = () => {
       };
 
       setMyTeam(createdTeam);
-      setTeams(prev => [createdTeam, ...prev]);
+      setTeams((prev) => [createdTeam, ...prev]);
 
-      toast.success('Team created!', {
+      toast.success("Team created!", {
         description: `You are now the admin of "${teamData.name}"`,
       });
     } catch (error) {
-      console.error('Error creating team:', error);
-      toast.error('Failed to create team');
+      console.error("Error creating team:", error);
+      toast.error("Failed to create team");
       throw error;
     }
   };
 
-  const handleUserSwipe = useCallback((direction: 'left' | 'right') => {
-    if (users.length === 0) return;
-    
-    const currentUserProfile = users[0];
-    
-    setHistory((prev) => [...prev, { type: 'user', item: currentUserProfile, direction }]);
-    
-    if (direction === 'right') {
-      if (Math.random() < 0.3) {
-        setMatches((prev) => [...prev, currentUserProfile.id]);
-        toast.success(`It's a match! 🎉`, {
-          description: `You and ${currentUserProfile.name} both expressed interest!`,
-        });
-      } else {
-        toast.info(`Interest sent to ${currentUserProfile.name}`, {
-          description: "You'll be notified if they're interested too!",
+  const handleUserSwipe = useCallback(
+    (direction: "left" | "right") => {
+      if (users.length === 0) return;
+
+      const currentUserProfile = users[0];
+
+      setHistory((prev) => [...prev, { type: "user", item: currentUserProfile, direction }]);
+
+      if (direction === "right") {
+        if (Math.random() < 0.3) {
+          setMatches((prev) => [...prev, currentUserProfile.id]);
+          toast.success(`It's a match! 🎉`, {
+            description: `You and ${currentUserProfile.name} both expressed interest!`,
+          });
+        } else {
+          toast.info(`Interest sent to ${currentUserProfile.name}`, {
+            description: "You'll be notified if they're interested too!",
+          });
+        }
+      }
+
+      setUsers((prev) => prev.slice(1));
+    },
+    [users],
+  );
+
+  const handleTeamSwipe = useCallback(
+    (direction: "left" | "right") => {
+      if (teams.length === 0) return;
+
+      const currentTeam = teams[0];
+
+      setHistory((prev) => [...prev, { type: "team", item: currentTeam, direction }]);
+
+      if (direction === "right") {
+        toast.success(`Request sent to ${currentTeam.name}!`, {
+          description: "The team will review your profile.",
         });
       }
-    }
-    
-    setUsers((prev) => prev.slice(1));
-  }, [users]);
 
-  const handleTeamSwipe = useCallback((direction: 'left' | 'right') => {
-    if (teams.length === 0) return;
-    
-    const currentTeam = teams[0];
-    
-    setHistory((prev) => [...prev, { type: 'team', item: currentTeam, direction }]);
-    
-    if (direction === 'right') {
-      toast.success(`Request sent to ${currentTeam.name}!`, {
-        description: "The team will review your profile.",
-      });
-    }
-    
-    setTeams((prev) => prev.slice(1));
-  }, [teams]);
+      setTeams((prev) => prev.slice(1));
+    },
+    [teams],
+  );
 
   const handleUndo = useCallback(() => {
     if (history.length === 0) return;
-    
+
     const lastAction = history[history.length - 1];
-    
-    if (lastAction.type === 'user' && activeTab === 'individuals') {
+
+    if (lastAction.type === "user" && activeTab === "individuals") {
       setUsers((prev) => [lastAction.item as UserProfile, ...prev]);
-      if (lastAction.direction === 'right') {
+      if (lastAction.direction === "right") {
         setMatches((prev) => prev.filter((id) => id !== (lastAction.item as UserProfile).id));
       }
-      toast.info('Undid last swipe');
-    } else if (lastAction.type === 'team' && activeTab === 'teams') {
+      toast.info("Undid last swipe");
+    } else if (lastAction.type === "team" && activeTab === "teams") {
       setTeams((prev) => [lastAction.item as Team, ...prev]);
-      toast.info('Undid last swipe');
+      toast.info("Undid last swipe");
     }
-    
+
     setHistory((prev) => prev.slice(0, -1));
   }, [history, activeTab]);
 
@@ -511,10 +501,10 @@ const Index = () => {
     setIsTeamModalOpen(true);
   };
 
-  const canUndo = history.length > 0 && (
-    (activeTab === 'individuals' && history[history.length - 1]?.type === 'user') ||
-    (activeTab === 'teams' && history[history.length - 1]?.type === 'team')
-  );
+  const canUndo =
+    history.length > 0 &&
+    ((activeTab === "individuals" && history[history.length - 1]?.type === "user") ||
+      (activeTab === "teams" && history[history.length - 1]?.type === "team"));
 
   // Show loading state
   if (loading || (profile && (loadingProfiles || loadingTeams))) {
@@ -534,11 +524,11 @@ const Index = () => {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
 
-  const currentItems = activeTab === 'individuals' ? users : teams;
+  const currentItems = activeTab === "individuals" ? users : teams;
   const isLastCard = currentItems.length === 1;
   const hasCards = currentItems.length > 0;
 
-  const currentUserProfile: Omit<UserProfile, 'id'> = {
+  const currentUserProfile: Omit<UserProfile, "id"> = {
     name: profile.name,
     program: profile.program,
     skills: profile.skills,
@@ -550,8 +540,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header 
-        activeTab={activeTab} 
+      <Header
+        activeTab={activeTab}
         onTabChange={setActiveTab}
         matchCount={matches.length}
         onProfileClick={() => setIsMyProfileOpen(true)}
@@ -562,33 +552,20 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-8">
         {/* Team Status Banner */}
-        <motion.div
-          className="mb-4"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div className="mb-4" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           {myTeam ? (
             <div className="flex items-center justify-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20">
               <span className="text-sm">
                 You're part of <strong>{myTeam.name}</strong>
               </span>
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => setIsTeamManagementOpen(true)}
-              >
+              <Button size="sm" variant="outline" onClick={() => setIsTeamManagementOpen(true)}>
                 Manage Team
               </Button>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-3 p-3 rounded-xl bg-accent/50 border border-border">
-              <span className="text-sm text-muted-foreground">
-                You're not in a team yet
-              </span>
-              <Button 
-                size="sm" 
-                onClick={() => setIsCreateTeamOpen(true)}
-              >
+              <span className="text-sm text-muted-foreground">You're not in a team yet</span>
+              <Button size="sm" onClick={() => setIsCreateTeamOpen(true)}>
                 <Plus className="w-4 h-4 mr-1" />
                 Create Team
               </Button>
@@ -597,19 +574,14 @@ const Index = () => {
         </motion.div>
 
         {/* Hero Text */}
-        <motion.div
-          className="text-center mb-4"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div className="text-center mb-4" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-3xl sm:text-4xl font-bold mb-2">
             <span className="text-gradient">Spring Studio</span> Team Matching
           </h2>
           <p className="text-muted-foreground">
-            {activeTab === 'individuals' 
-              ? `${users.length} ${users.length === 1 ? 'person' : 'people'} to discover`
-              : `${teams.length} ${teams.length === 1 ? 'team' : 'teams'} to explore`
-            }
+            {activeTab === "individuals"
+              ? `${users.length} ${users.length === 1 ? "person" : "people"} to discover`
+              : `${teams.length} ${teams.length === 1 ? "team" : "teams"} to explore`}
           </p>
         </motion.div>
 
@@ -621,11 +593,11 @@ const Index = () => {
             animate={{ opacity: 1 }}
           >
             <span className="flex items-center gap-1">
-              <span className="text-destructive">←</span> Pass
+              <span className="text-destructive">←</span>Swipe left to Pass
             </span>
             <span className="border-l border-border pl-4">Tap for details</span>
             <span className="flex items-center gap-1 border-l border-border pl-4">
-              Like <span className="text-primary">→</span>
+              Swipe right to Like <span className="text-primary">→</span>
             </span>
           </motion.div>
         )}
@@ -634,17 +606,19 @@ const Index = () => {
         <div className="relative flex items-start justify-center pb-8">
           <div className="relative w-full max-w-sm h-[420px] sm:h-[460px]">
             <AnimatePresence mode="popLayout">
-              {activeTab === 'individuals' ? (
+              {activeTab === "individuals" ? (
                 hasCards ? (
-                  users.slice(0, 2).map((user, index) => (
-                    <SwipeableCard
-                      key={user.id}
-                      profile={user}
-                      onSwipe={handleUserSwipe}
-                      onTap={() => handleProfileTap(user)}
-                      isTop={index === 0}
-                    />
-                  ))
+                  users
+                    .slice(0, 2)
+                    .map((user, index) => (
+                      <SwipeableCard
+                        key={user.id}
+                        profile={user}
+                        onSwipe={handleUserSwipe}
+                        onTap={() => handleProfileTap(user)}
+                        isTop={index === 0}
+                      />
+                    ))
                 ) : (
                   <motion.div
                     key="empty-users"
@@ -654,15 +628,14 @@ const Index = () => {
                   >
                     <p className="text-muted-foreground mb-4">You've seen everyone!</p>
                     {canUndo && (
-                      <p className="text-sm text-muted-foreground">
-                        Use the undo button to go back through profiles
-                      </p>
+                      <p className="text-sm text-muted-foreground">Use the undo button to go back through profiles</p>
                     )}
                   </motion.div>
                 )
-              ) : (
-                hasCards ? (
-                  teams.slice(0, 2).map((team, index) => (
+              ) : hasCards ? (
+                teams
+                  .slice(0, 2)
+                  .map((team, index) => (
                     <SwipeableTeamCard
                       key={team.id}
                       team={team}
@@ -671,26 +644,22 @@ const Index = () => {
                       isTop={index === 0}
                     />
                   ))
-                ) : (
-                  <motion.div
-                    key="empty-teams"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-center py-12"
-                  >
-                    <p className="text-muted-foreground mb-4">You've seen all teams!</p>
-                    {canUndo && (
-                      <p className="text-sm text-muted-foreground">
-                        Use the undo button to go back through teams
-                      </p>
-                    )}
-                  </motion.div>
-                )
+              ) : (
+                <motion.div
+                  key="empty-teams"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-12"
+                >
+                  <p className="text-muted-foreground mb-4">You've seen all teams!</p>
+                  {canUndo && (
+                    <p className="text-sm text-muted-foreground">Use the undo button to go back through teams</p>
+                  )}
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
-
 
         {/* Studio Info */}
         <motion.div
@@ -700,9 +669,9 @@ const Index = () => {
           transition={{ delay: 0.3 }}
         >
           {[
-            { name: 'BigCo Studio', color: 'studio-bigco', desc: 'Fortune 500 innovation' },
-            { name: 'Startup Studio', color: 'studio-startup', desc: 'Build your venture' },
-            { name: 'PiTech Studio', color: 'studio-pitech', desc: 'Tech for social good' },
+            { name: "BigCo Studio", color: "studio-bigco", desc: "Fortune 500 innovation" },
+            { name: "Startup Studio", color: "studio-startup", desc: "Build your venture" },
+            { name: "PiTech Studio", color: "studio-pitech", desc: "Tech for social good" },
           ].map((studio) => (
             <div
               key={studio.name}
@@ -721,8 +690,8 @@ const Index = () => {
         profile={selectedProfile}
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        onLike={() => handleUserSwipe('right')}
-        onPass={() => handleUserSwipe('left')}
+        onLike={() => handleUserSwipe("right")}
+        onPass={() => handleUserSwipe("left")}
       />
 
       {/* Team Detail Modal */}
@@ -730,8 +699,8 @@ const Index = () => {
         team={selectedTeam}
         isOpen={isTeamModalOpen}
         onClose={() => setIsTeamModalOpen(false)}
-        onJoin={() => handleTeamSwipe('right')}
-        onPass={() => handleTeamSwipe('left')}
+        onJoin={() => handleTeamSwipe("right")}
+        onPass={() => handleTeamSwipe("left")}
       />
 
       {/* My Profile Modal */}
@@ -743,11 +712,7 @@ const Index = () => {
       />
 
       {/* Chat Modal */}
-      <ChatModal
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        currentUserId={user?.id || 'dev-user'}
-      />
+      <ChatModal isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} currentUserId={user?.id || "dev-user"} />
 
       {/* Create Team Modal */}
       <CreateTeamModal
@@ -761,7 +726,7 @@ const Index = () => {
         isOpen={isTeamManagementOpen}
         onClose={() => setIsTeamManagementOpen(false)}
         team={myTeam}
-        currentUserId={user?.id || ''}
+        currentUserId={user?.id || ""}
         onOpenChat={() => {
           setIsTeamManagementOpen(false);
           setIsChatOpen(true);
