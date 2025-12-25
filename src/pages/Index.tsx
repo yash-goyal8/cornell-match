@@ -819,6 +819,43 @@ const Index = () => {
           setIsTeamManagementOpen(false);
           setIsChatOpen(true);
         }}
+        onTeamDeleted={() => {
+          setMyTeam(null);
+          // Refresh profiles to show former team members in Find People
+          const fetchProfiles = async () => {
+            if (!user) return;
+            try {
+              const { data: teamMembers } = await supabase
+                .from("team_members")
+                .select("user_id")
+                .eq("status", "confirmed");
+              
+              const usersInTeams = new Set((teamMembers || []).map((tm) => tm.user_id));
+              
+              const { data } = await supabase.from("profiles").select("*").neq("user_id", user.id);
+              
+              const availableProfiles = (data || []).filter((p) => !usersInTeams.has(p.user_id));
+              
+              const transformedProfiles: UserProfile[] = availableProfiles.map((p) => ({
+                id: p.id,
+                name: p.name,
+                program: p.program as Program,
+                skills: p.skills || [],
+                bio: p.bio || "",
+                studioPreference: p.studio_preference as Studio,
+                avatar: p.avatar || undefined,
+                linkedIn: p.linkedin || undefined,
+              }));
+              
+              setUsers(transformedProfiles);
+            } catch (error) {
+              console.error("Error refreshing profiles:", error);
+            }
+          };
+          fetchProfiles();
+          // Also refresh teams list
+          setTeams((prev) => prev.filter((t) => t.id !== myTeam?.id));
+        }}
       />
     </div>
   );
