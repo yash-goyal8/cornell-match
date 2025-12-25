@@ -24,11 +24,11 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }:
         <>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 bg-background/95 backdrop-blur-sm z-[60]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
           />
 
           {/* Modal */}
@@ -42,7 +42,7 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass }:
             <div className="h-full rounded-2xl overflow-hidden shadow-card glass flex flex-col">
               {/* Close button */}
               <button
-                onClick={onClose}
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
                 className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-background/50 backdrop-blur flex items-center justify-center hover:bg-background/80 transition-colors"
               >
                 <X className="w-5 h-5 text-foreground" />
