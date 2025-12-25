@@ -11,12 +11,13 @@ import { MyProfileModal } from "@/components/MyProfileModal";
 import { ChatModal } from "@/components/chat/ChatModal";
 import { CreateTeamModal } from "@/components/CreateTeamModal";
 import { TeamManagementModal } from "@/components/TeamManagementModal";
+import { ActivityModal } from "@/components/ActivityModal";
 import { FilterPanel, PeopleFilters, TeamFilters } from "@/components/FilterPanel";
 import { UserProfile, Team, Program, Studio } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SwipeHistory {
@@ -36,6 +37,7 @@ const Index = () => {
   const [history, setHistory] = useState<SwipeHistory[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
 
   // Filter state
   const [peopleFilters, setPeopleFilters] = useState<PeopleFilters>({
@@ -511,6 +513,24 @@ const Index = () => {
     setHistory((prev) => prev.slice(0, -1));
   }, [history, activeTab]);
 
+  // Undo a specific action by index (from Activity modal)
+  const handleUndoByIndex = useCallback((index: number) => {
+    const action = history[index];
+    if (!action) return;
+
+    if (action.type === "user") {
+      setUsers((prev) => [action.item as UserProfile, ...prev]);
+      if (action.direction === "right") {
+        setMatches((prev) => prev.filter((id) => id !== (action.item as UserProfile).id));
+      }
+    } else if (action.type === "team") {
+      setTeams((prev) => [action.item as Team, ...prev]);
+    }
+
+    setHistory((prev) => prev.filter((_, i) => i !== index));
+    toast.info("Action undone");
+  }, [history]);
+
   const handleProfileTap = (profile: UserProfile) => {
     setSelectedProfile(profile);
     setIsProfileModalOpen(true);
@@ -665,20 +685,38 @@ const Index = () => {
           </p>
         </motion.div>
 
-        {/* Filter Panel */}
-        {activeTab === "individuals" ? (
-          <FilterPanel
-            type="people"
-            peopleFilters={peopleFilters}
-            onPeopleFiltersChange={setPeopleFilters}
-          />
-        ) : (
-          <FilterPanel
-            type="teams"
-            teamFilters={teamFilters}
-            onTeamFiltersChange={setTeamFilters}
-          />
-        )}
+        {/* Filter Panel and Activity Button */}
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex-1">
+            {activeTab === "individuals" ? (
+              <FilterPanel
+                type="people"
+                peopleFilters={peopleFilters}
+                onPeopleFiltersChange={setPeopleFilters}
+              />
+            ) : (
+              <FilterPanel
+                type="teams"
+                teamFilters={teamFilters}
+                onTeamFiltersChange={setTeamFilters}
+              />
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsActivityOpen(true)}
+            className="gap-2"
+          >
+            <History className="w-4 h-4" />
+            Activity
+            {history.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+                {history.length}
+              </span>
+            )}
+          </Button>
+        </div>
 
         {/* Swipe Instructions */}
         {hasCards && (
@@ -868,6 +906,15 @@ const Index = () => {
           // Also refresh teams list
           setTeams((prev) => prev.filter((t) => t.id !== myTeam?.id));
         }}
+      />
+
+      {/* Activity Modal */}
+      <ActivityModal
+        open={isActivityOpen}
+        onOpenChange={setIsActivityOpen}
+        history={history}
+        onUndo={handleUndoByIndex}
+        activeTabContext={activeTab}
       />
     </div>
   );
