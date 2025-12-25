@@ -22,15 +22,15 @@ export const TeamCard = ({ team }: TeamCardProps) => {
     >
       <div className="rounded-2xl overflow-hidden shadow-card glass min-h-[420px] sm:min-h-[480px] flex flex-col">
         {/* Header */}
-        <div className="p-4 sm:p-5 gradient-card border-b border-border/50">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl ${studioData.color} flex items-center justify-center`}>
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+        <div className="p-5 sm:p-6 gradient-card border-b border-border/50">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl ${studioData.color} flex items-center justify-center`}>
+                <Users className="w-7 h-7 sm:w-8 sm:h-8 text-primary-foreground" />
               </div>
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">{team.name}</h2>
-                <p className="text-sm text-muted-foreground">{studioData.name}</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">{team.name}</h2>
+                <p className="text-sm sm:text-base text-muted-foreground">{studioData.name}</p>
               </div>
             </div>
             <span className="px-3 py-1.5 rounded-full text-sm font-semibold bg-secondary text-secondary-foreground">
@@ -39,19 +39,19 @@ export const TeamCard = ({ team }: TeamCardProps) => {
           </div>
 
           {/* Team Members */}
-          <div className="flex -space-x-2">
+          <div className="flex -space-x-3">
             {team.members.map((member) => (
-              <Avatar key={member.id} className="border-2 border-background w-10 h-10 sm:w-11 sm:h-11">
+              <Avatar key={member.id} className="border-2 border-background w-12 h-12 sm:w-14 sm:h-14">
                 <AvatarImage src={member.avatar} alt={member.name} />
-                <AvatarFallback>{member.name[0]}</AvatarFallback>
+                <AvatarFallback className="text-base">{member.name[0]}</AvatarFallback>
               </Avatar>
             ))}
             {Array.from({ length: 6 - team.members.length }).map((_, i) => (
               <div
                 key={`empty-${i}`}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted/30 flex items-center justify-center"
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-dashed border-muted-foreground/30 bg-muted/30 flex items-center justify-center"
               >
-                <span className="text-muted-foreground text-sm">?</span>
+                <span className="text-muted-foreground text-base">?</span>
               </div>
             ))}
           </div>
