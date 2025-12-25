@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Team } from '@/types';
+import { Team, UserProfile } from '@/types';
 import { programColors, studioInfo } from '@/data/mockData';
 import { X, Users, Target, Sparkles, Building2, Rocket, Heart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { MemberProfileModal } from '@/components/MemberProfileModal';
 
 interface TeamDetailModalProps {
   team: Team | null;
@@ -21,10 +23,18 @@ const studioIcons = {
 };
 
 export const TeamDetailModal = ({ team, isOpen, onClose, onJoin, onPass }: TeamDetailModalProps) => {
+  const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+
   if (!team) return null;
 
   const studioData = studioInfo[team.studio];
   const StudioIcon = studioIcons[team.studio];
+
+  const handleMemberClick = (member: UserProfile) => {
+    setSelectedMember(member);
+    setIsMemberModalOpen(true);
+  };
 
   return (
     <AnimatePresence>
@@ -94,7 +104,11 @@ export const TeamDetailModal = ({ team, isOpen, onClose, onJoin, onPass }: TeamD
                     {/* Member avatars with names */}
                     <div className="space-y-2">
                       {team.members.map((member) => (
-                        <div key={member.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
+                        <div 
+                          key={member.id} 
+                          className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50 cursor-pointer hover:bg-secondary/80 transition-colors"
+                          onClick={() => handleMemberClick(member)}
+                        >
                           <Avatar className="w-10 h-10">
                             <AvatarImage src={member.avatar} alt={member.name} />
                             <AvatarFallback>{member.name[0]}</AvatarFallback>
@@ -185,6 +199,12 @@ export const TeamDetailModal = ({ team, isOpen, onClose, onJoin, onPass }: TeamD
               </div>
             </div>
           </motion.div>
+          {/* Member Profile Modal */}
+          <MemberProfileModal
+            profile={selectedMember}
+            isOpen={isMemberModalOpen}
+            onClose={() => setIsMemberModalOpen(false)}
+          />
         </>
       )}
     </AnimatePresence>
