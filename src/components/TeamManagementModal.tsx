@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Team, UserProfile, Program, Studio } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Users, Crown, MoreVertical, UserPlus, Shield, UserMinus, Loader2, MessageSquare } from 'lucide-react';
+import { Users, Crown, MoreVertical, UserPlus, Shield, UserMinus, Loader2, MessageSquare, Trash2 } from 'lucide-react';
 import { MemberProfileModal } from './MemberProfileModal';
 
 interface TeamMember extends UserProfile {
@@ -22,6 +23,7 @@ interface TeamManagementModalProps {
   team: Team | null;
   currentUserId: string;
   onOpenChat: () => void;
+  onTeamDeleted?: () => void;
 }
 
 export const TeamManagementModal = ({ 
@@ -29,7 +31,8 @@ export const TeamManagementModal = ({
   onClose, 
   team, 
   currentUserId,
-  onOpenChat 
+  onOpenChat,
+  onTeamDeleted
 }: TeamManagementModalProps) => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([]);
@@ -37,6 +40,9 @@ export const TeamManagementModal = ({
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [addingMember, setAddingMember] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const isTeamOwner = team?.createdBy === currentUserId;
 
   const isCurrentUserAdmin = members.some(m => m.id === currentUserId && m.role === 'admin') || 
                               team?.createdBy === currentUserId;
@@ -254,6 +260,64 @@ export const TeamManagementModal = ({
     }
   };
 
+  const handleDeleteTeam = async () => {
+    if (!team || !isTeamOwner) return;
+    
+    setDeleting(true);
+    try {
+      // 1. Delete conversation participants for team conversation
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('team_id', team.id)
+        .eq('type', 'team')
+        .maybeSingle();
+
+      if (conversation) {
+        // Delete all participants
+        await supabase
+          .from('conversation_participants')
+          .delete()
+          .eq('conversation_id', conversation.id);
+        
+        // Delete messages (if any)
+        await supabase
+          .from('messages')
+          .delete()
+          .eq('conversation_id', conversation.id);
+        
+        // Delete the conversation
+        await supabase
+          .from('conversations')
+          .delete()
+          .eq('id', conversation.id);
+      }
+
+      // 2. Delete team members
+      await supabase
+        .from('team_members')
+        .delete()
+        .eq('team_id', team.id);
+
+      // 3. Delete the team
+      const { error } = await supabase
+        .from('teams')
+        .delete()
+        .eq('id', team.id);
+
+      if (error) throw error;
+
+      toast.success('Team deleted successfully');
+      onClose();
+      onTeamDeleted?.();
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      toast.error('Failed to delete team');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!team) return null;
 
   return (
@@ -421,6 +485,48 @@ export const TeamManagementModal = ({
               </ScrollArea>
             )}
           </div>
+
+          {/* Delete Team Section */}
+          {isTeamOwner && (
+            <div className="pt-4 border-t border-border">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="destructive" 
+                    className="w-full"
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    Delete Team
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Team?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the team "{team.name}", 
+                      remove all members, and delete all team conversations.
+                      <br /><br />
+                      All team members will become available again in the Find People tab.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleDeleteTeam}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete Team
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </div>
 
         {/* Member Profile Modal */}
