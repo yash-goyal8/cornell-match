@@ -87,6 +87,7 @@ export const TeamManagementModal = ({
             skills: profile?.skills || [],
             bio: profile?.bio || '',
             studioPreference: (profile?.studio_preference || 'startup') as Studio,
+            studioPreferences: (profile?.studio_preferences as Studio[]) || [(profile?.studio_preference || 'startup') as Studio],
             avatar: profile?.avatar || '',
             linkedIn: profile?.linkedin,
             role: m.role,
@@ -134,6 +135,7 @@ export const TeamManagementModal = ({
           skills: p.skills || [],
           bio: p.bio || '',
           studioPreference: p.studio_preference as Studio,
+          studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
           avatar: p.avatar || '',
           linkedIn: p.linkedin,
         }));

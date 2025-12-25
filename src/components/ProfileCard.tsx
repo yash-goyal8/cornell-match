@@ -10,7 +10,8 @@ interface ProfileCardProps {
 }
 
 export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
-  const studioData = studioInfo[profile.studioPreference];
+  const studioPrefs = profile.studioPreferences || [profile.studioPreference];
+  const primaryStudio = studioInfo[studioPrefs[0]];
 
   return (
     <motion.div
@@ -31,9 +32,19 @@ export const ProfileCard = ({ profile, style }: ProfileCardProps) => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
           
-          {/* Studio Badge */}
-          <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold ${studioData.color} text-primary-foreground`}>
-            {studioData.name}
+          {/* Studio Badges */}
+          <div className="absolute top-3 right-3 flex flex-wrap gap-1 justify-end max-w-[60%]">
+            {studioPrefs.map((studio) => {
+              const studioData = studioInfo[studio];
+              return (
+                <div 
+                  key={studio}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold ${studioData.color} text-primary-foreground`}
+                >
+                  {studioData.name}
+                </div>
+              );
+            })}
           </div>
         </div>
 

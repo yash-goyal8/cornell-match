@@ -8,7 +8,8 @@ export interface UserProfile {
   program: Program;
   skills: string[];
   bio: string;
-  studioPreference: Studio;
+  studioPreference: Studio; // Keep for backwards compatibility
+  studioPreferences: Studio[]; // New: multiple studio preferences
   avatar: string;
   linkedIn?: string;
 }
