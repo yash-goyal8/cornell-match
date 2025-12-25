@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Plus, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface SwipeHistory {
   type: "user" | "team";
@@ -686,7 +687,7 @@ const Index = () => {
         </motion.div>
 
         {/* Filter Panel and Activity Button */}
-        <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-start justify-center gap-2 mb-4 max-w-sm mx-auto">
           <div className="flex-1">
             {activeTab === "individuals" ? (
               <FilterPanel
@@ -706,14 +707,14 @@ const Index = () => {
             variant="outline"
             size="sm"
             onClick={() => setIsActivityOpen(true)}
-            className="gap-2"
+            className="gap-2 shrink-0"
           >
             <History className="w-4 h-4" />
             Activity
             {history.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
+              <Badge className="ml-1 px-1.5 py-0 text-xs">
                 {history.length}
-              </span>
+              </Badge>
             )}
           </Button>
         </div>
