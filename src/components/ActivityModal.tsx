@@ -148,10 +148,23 @@ export const ActivityModal = ({
     );
   };
 
+  // Prevent Activity modal from closing when profile/team modal is open
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && (selectedProfile || selectedTeam)) {
+      // Don't close if a profile or team modal is open
+      return;
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-md" onPointerDownOutside={(e) => {
+          if (selectedProfile || selectedTeam) {
+            e.preventDefault();
+          }
+        }}>
           <DialogHeader>
             <DialogTitle>Activity</DialogTitle>
           </DialogHeader>
