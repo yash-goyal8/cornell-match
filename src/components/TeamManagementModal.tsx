@@ -43,9 +43,10 @@ export const TeamManagementModal = ({
   const [deleting, setDeleting] = useState(false);
 
   const isTeamOwner = team?.createdBy === currentUserId;
-
-  const isCurrentUserAdmin = members.some(m => m.id === currentUserId && m.role === 'admin') || 
-                              team?.createdBy === currentUserId;
+  
+  // Only team owner can manage members (enforced by RLS policies)
+  // The 'admin' role in database is UI-only and doesn't grant actual database privileges
+  const canManageMembers = isTeamOwner;
 
   useEffect(() => {
     if (isOpen && team) {
@@ -342,7 +343,7 @@ export const TeamManagementModal = ({
               <MessageSquare className="w-4 h-4 mr-2" />
               Team Chat
             </Button>
-            {isCurrentUserAdmin && (
+            {canManageMembers && (
               <Button 
                 variant="outline" 
                 className="flex-1"
@@ -355,7 +356,7 @@ export const TeamManagementModal = ({
           </div>
 
           {/* Add members section */}
-          {showAddMembers && isCurrentUserAdmin && (
+          {showAddMembers && canManageMembers && (
             <div className="p-3 rounded-lg bg-accent/30 space-y-2">
               <p className="text-sm font-medium">Available Users</p>
               {availableUsers.length === 0 ? (
@@ -435,7 +436,7 @@ export const TeamManagementModal = ({
                         </div>
                       </div>
 
-                      {isCurrentUserAdmin && member.id !== currentUserId && (
+                      {canManageMembers && member.id !== currentUserId && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button 
