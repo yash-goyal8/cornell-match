@@ -17,6 +17,7 @@ import { UserProfile, Team, Program, Studio } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { profileSchema, teamSchema, validateInput } from "@/lib/validation";
 import { Loader2, Plus, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -294,18 +295,26 @@ const Index = () => {
   const handleOnboardingComplete = async (profileData: Omit<UserProfile, "id">) => {
     if (!user) return;
 
+    // Validate input data
+    const validation = validateInput(profileSchema, profileData);
+    if (!validation.success) {
+      toast.error((validation as { success: false; error: string }).error);
+      return;
+    }
+    const validatedData = (validation as { success: true; data: typeof profileData }).data;
+
     setSavingProfile(true);
     try {
       const { error } = await supabase.from("profiles").insert({
         user_id: user.id,
-        name: profileData.name,
-        program: profileData.program,
-        skills: profileData.skills,
-        bio: profileData.bio,
-        studio_preference: profileData.studioPreference,
-        studio_preferences: profileData.studioPreferences,
-        avatar: profileData.avatar,
-        linkedin: profileData.linkedIn,
+        name: validatedData.name,
+        program: validatedData.program,
+        skills: validatedData.skills,
+        bio: validatedData.bio,
+        studio_preference: validatedData.studioPreference,
+        studio_preferences: validatedData.studioPreferences,
+        avatar: validatedData.avatar,
+        linkedin: validatedData.linkedIn,
       });
 
       if (error) {
@@ -315,7 +324,7 @@ const Index = () => {
       }
 
       await refreshProfile();
-      toast.success(`Welcome, ${profileData.name}!`, {
+      toast.success(`Welcome, ${validatedData.name}!`, {
         description: "Your profile is ready. Start swiping to find teammates!",
       });
     } catch (error) {
@@ -329,18 +338,26 @@ const Index = () => {
   const handleProfileUpdate = async (updatedProfile: Omit<UserProfile, "id">) => {
     if (!user) return;
 
+    // Validate input data
+    const validation = validateInput(profileSchema, updatedProfile);
+    if (!validation.success) {
+      toast.error((validation as { success: false; error: string }).error);
+      return;
+    }
+    const validatedData = (validation as { success: true; data: typeof updatedProfile }).data;
+
     try {
       const { error } = await supabase
         .from("profiles")
         .update({
-          name: updatedProfile.name,
-          program: updatedProfile.program,
-          skills: updatedProfile.skills,
-          bio: updatedProfile.bio,
-          studio_preference: updatedProfile.studioPreference,
-          studio_preferences: updatedProfile.studioPreferences,
-          avatar: updatedProfile.avatar,
-          linkedin: updatedProfile.linkedIn,
+          name: validatedData.name,
+          program: validatedData.program,
+          skills: validatedData.skills,
+          bio: validatedData.bio,
+          studio_preference: validatedData.studioPreference,
+          studio_preferences: validatedData.studioPreferences,
+          avatar: validatedData.avatar,
+          linkedin: validatedData.linkedIn,
         })
         .eq("user_id", user.id);
 
@@ -366,16 +383,24 @@ const Index = () => {
   }) => {
     if (!user) return;
 
+    // Validate input data
+    const validation = validateInput(teamSchema, teamData);
+    if (!validation.success) {
+      toast.error((validation as { success: false; error: string }).error);
+      return;
+    }
+    const validatedData = (validation as { success: true; data: typeof teamData }).data;
+
     try {
       // 1. Create the team
       const { data: newTeam, error: teamError } = await supabase
         .from("teams")
         .insert({
-          name: teamData.name,
-          description: teamData.description,
-          studio: teamData.studio,
-          looking_for: teamData.lookingFor,
-          skills_needed: teamData.skillsNeeded,
+          name: validatedData.name,
+          description: validatedData.description,
+          studio: validatedData.studio,
+          looking_for: validatedData.lookingFor,
+          skills_needed: validatedData.skillsNeeded,
           created_by: user.id,
         })
         .select()

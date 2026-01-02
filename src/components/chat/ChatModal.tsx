@@ -6,6 +6,7 @@ import { Conversation, Message, Match } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { messageSchema, validateInput } from '@/lib/validation';
 
 interface ChatModalProps {
   isOpen: boolean;
@@ -265,11 +266,23 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
   const handleSendMessage = async (content: string) => {
     if (!selectedConversation) return;
 
+    // Validate message input
+    const validation = validateInput(messageSchema, {
+      content,
+      conversationId: selectedConversation.id,
+      senderId: currentUserId,
+    });
+    if (!validation.success) {
+      toast.error((validation as { success: false; error: string }).error);
+      return;
+    }
+    const validatedData = (validation as { success: true; data: { content: string; conversationId: string; senderId: string } }).data;
+
     try {
       const { error } = await supabase.from('messages').insert({
-        conversation_id: selectedConversation.id,
-        sender_id: currentUserId,
-        content,
+        conversation_id: validatedData.conversationId,
+        sender_id: validatedData.senderId,
+        content: validatedData.content,
       });
 
       if (error) throw error;
