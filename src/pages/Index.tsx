@@ -15,6 +15,7 @@ import { ActivityModal } from "@/components/ActivityModal";
 import { FilterPanel, PeopleFilters, TeamFilters } from "@/components/FilterPanel";
 import { UserProfile, Team, Program, Studio } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTeamMatching } from "@/hooks/useTeamMatching";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { profileSchema, teamSchema, validateInput } from "@/lib/validation";
@@ -219,6 +220,15 @@ const Index = () => {
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
   const [myTeam, setMyTeam] = useState<Team | null>(null);
+
+  // Team matching hook
+  const { createTeamToIndividualMatch, createIndividualToTeamMatch } = useTeamMatching({
+    currentUserId: user?.id || '',
+    myTeam,
+    onMatchCreated: () => {
+      // Could refresh data here if needed
+    },
+  });
 
   // Check if current user has a team
   useEffect(() => {
@@ -476,7 +486,7 @@ const Index = () => {
   };
 
   const handleUserSwipe = useCallback(
-    (direction: "left" | "right") => {
+    async (direction: "left" | "right") => {
       if (users.length === 0) return;
 
       const currentUserProfile = users[0];
@@ -484,25 +494,31 @@ const Index = () => {
       setHistory((prev) => [...prev, { type: "user", item: currentUserProfile, direction }]);
 
       if (direction === "right") {
-        if (Math.random() < 0.3) {
-          setMatches((prev) => [...prev, currentUserProfile.id]);
-          toast.success(`It's a match! 🎉`, {
-            description: `You and ${currentUserProfile.name} both expressed interest!`,
-          });
+        // If user is part of a team, create team-to-individual match
+        if (myTeam) {
+          await createTeamToIndividualMatch(currentUserProfile);
         } else {
-          toast.info(`Interest sent to ${currentUserProfile.name}`, {
-            description: "You'll be notified if they're interested too!",
-          });
+          // Individual to individual matching (original behavior)
+          if (Math.random() < 0.3) {
+            setMatches((prev) => [...prev, currentUserProfile.id]);
+            toast.success(`It's a match! 🎉`, {
+              description: `You and ${currentUserProfile.name} both expressed interest!`,
+            });
+          } else {
+            toast.info(`Interest sent to ${currentUserProfile.name}`, {
+              description: "You'll be notified if they're interested too!",
+            });
+          }
         }
       }
 
       setUsers((prev) => prev.slice(1));
     },
-    [users],
+    [users, myTeam, createTeamToIndividualMatch],
   );
 
   const handleTeamSwipe = useCallback(
-    (direction: "left" | "right") => {
+    async (direction: "left" | "right") => {
       if (teams.length === 0) return;
 
       const currentTeam = teams[0];
@@ -510,14 +526,13 @@ const Index = () => {
       setHistory((prev) => [...prev, { type: "team", item: currentTeam, direction }]);
 
       if (direction === "right") {
-        toast.success(`Request sent to ${currentTeam.name}!`, {
-          description: "The team will review your profile.",
-        });
+        // Individual swipes on team - create individual-to-team match
+        await createIndividualToTeamMatch(currentTeam);
       }
 
       setTeams((prev) => prev.slice(1));
     },
-    [teams],
+    [teams, createIndividualToTeamMatch],
   );
 
   const handleUndo = useCallback(() => {
@@ -875,7 +890,68 @@ const Index = () => {
       />
 
       {/* Chat Modal */}
-      <ChatModal isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} currentUserId={user?.id || "dev-user"} />
+      <ChatModal 
+        isOpen={isChatOpen} 
+        onClose={() => setIsChatOpen(false)} 
+        currentUserId={user?.id || "dev-user"}
+        onMemberAdded={() => {
+          // Refresh team data when a member is added
+          const refreshTeamData = async () => {
+            if (!user) return;
+            
+            // Check if user has a team now
+            const { data: membership } = await supabase
+              .from("team_members")
+              .select("team_id")
+              .eq("user_id", user.id)
+              .eq("status", "confirmed")
+              .maybeSingle();
+
+            if (membership) {
+              const { data: teamData } = await supabase.from("teams").select("*").eq("id", membership.team_id).single();
+
+              if (teamData) {
+                const { data: members } = await supabase
+                  .from("team_members")
+                  .select("user_id")
+                  .eq("team_id", teamData.id)
+                  .eq("status", "confirmed");
+
+                const memberUserIds = (members || []).map((m) => m.user_id);
+                let teamMembers: UserProfile[] = [];
+
+                if (memberUserIds.length > 0) {
+                  const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", memberUserIds);
+
+                  teamMembers = (profiles || []).map((p) => ({
+                    id: p.user_id,
+                    name: p.name,
+                    program: p.program as Program,
+                    skills: p.skills || [],
+                    bio: p.bio || "",
+                    studioPreference: p.studio_preference as Studio,
+                    studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
+                    avatar: p.avatar || "",
+                    linkedIn: p.linkedin,
+                  }));
+                }
+
+                setMyTeam({
+                  id: teamData.id,
+                  name: teamData.name,
+                  description: teamData.description || "",
+                  studio: teamData.studio as Studio,
+                  members: teamMembers,
+                  lookingFor: [],
+                  skillsNeeded: [],
+                  createdBy: teamData.created_by,
+                });
+              }
+            }
+          };
+          refreshTeamData();
+        }}
+      />
 
       {/* Create Team Modal */}
       <CreateTeamModal

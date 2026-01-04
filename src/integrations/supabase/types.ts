@@ -47,6 +47,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          match_id: string | null
           team_id: string | null
           type: string
           updated_at: string
@@ -54,6 +55,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          match_id?: string | null
           team_id?: string | null
           type: string
           updated_at?: string
@@ -61,11 +63,19 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          match_id?: string | null
           team_id?: string | null
           type?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_team_id_fkey"
             columns: ["team_id"]
@@ -79,28 +89,42 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          match_type: string
           status: string
           target_user_id: string
+          team_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          match_type?: string
           status?: string
           target_user_id: string
+          team_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          match_type?: string
           status?: string
           target_user_id?: string
+          team_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "matches_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {

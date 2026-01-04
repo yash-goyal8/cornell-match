@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ChatList } from './ChatList';
 import { ChatRoom } from './ChatRoom';
-import { Conversation, Message, Match } from '@/types/chat';
+import { Conversation, Message, Match, JoinRequestMatch } from '@/types/chat';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -12,15 +12,29 @@ interface ChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUserId: string;
+  onMemberAdded?: () => void;
 }
 
-export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) => {
+export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: ChatModalProps) => {
   const [view, setView] = useState<'list' | 'room'>('list');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
+  const [joinRequestMatch, setJoinRequestMatch] = useState<JoinRequestMatch | null>(null);
+
+  // Check which teams the user is a member of
+  const fetchUserTeams = useCallback(async () => {
+    const { data: memberships } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', currentUserId)
+      .eq('status', 'confirmed');
+    
+    setUserTeamIds((memberships || []).map(m => m.team_id));
+  }, [currentUserId]);
 
   // Fetch conversations and matches when modal opens
   useEffect(() => {
@@ -29,25 +43,119 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch user's conversations
+        await fetchUserTeams();
+
+        // Fetch user's direct conversations (as participant)
         const { data: participations } = await supabase
           .from('conversation_participants')
           .select('conversation_id')
           .eq('user_id', currentUserId);
 
-        if (participations && participations.length > 0) {
-          const conversationIds = participations.map((p) => p.conversation_id);
+        const participantConvIds = (participations || []).map(p => p.conversation_id);
+
+        // Also fetch conversations related to team matches (where user is team member)
+        const { data: teamMemberships } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', currentUserId)
+          .eq('status', 'confirmed');
+
+        const teamIds = (teamMemberships || []).map(m => m.team_id);
+        
+        let teamMatchConvIds: string[] = [];
+        if (teamIds.length > 0) {
+          // Find matches involving user's teams
+          const { data: teamMatches } = await supabase
+            .from('matches')
+            .select('id')
+            .in('team_id', teamIds);
+
+          const matchIds = (teamMatches || []).map(m => m.id);
           
+          if (matchIds.length > 0) {
+            const { data: matchConvs } = await supabase
+              .from('conversations')
+              .select('id')
+              .in('match_id', matchIds);
+            
+            teamMatchConvIds = (matchConvs || []).map(c => c.id);
+          }
+        }
+
+        // Combine and dedupe conversation IDs
+        const allConvIds = [...new Set([...participantConvIds, ...teamMatchConvIds])];
+
+        if (allConvIds.length > 0) {
           const { data: convData } = await supabase
             .from('conversations')
             .select('*')
-            .in('id', conversationIds);
+            .in('id', allConvIds);
 
-          // Get other participants for each conversation
-          const conversationsWithUsers: Conversation[] = await Promise.all(
+          // Get other participants and match details for each conversation
+          const conversationsWithDetails: Conversation[] = await Promise.all(
             (convData || []).map(async (conv) => {
-              if (conv.type === 'direct') {
-                // Get other user in conversation
+              let otherUser = undefined;
+              let team = undefined;
+              let match = undefined;
+
+              // If this is a join request conversation, fetch match details
+              if (conv.match_id) {
+                const { data: matchData } = await supabase
+                  .from('matches')
+                  .select('*')
+                  .eq('id', conv.match_id)
+                  .single();
+
+                if (matchData) {
+                  // Get team info
+                  const { data: teamData } = await supabase
+                    .from('teams')
+                    .select('id, name')
+                    .eq('id', matchData.team_id)
+                    .single();
+
+                  // Determine who the "other" person is based on match type
+                  const individualUserId = matchData.match_type === 'team_to_individual' 
+                    ? matchData.target_user_id 
+                    : matchData.user_id;
+
+                  const { data: individualProfile } = await supabase
+                    .from('profiles')
+                    .select('user_id, name, avatar, program')
+                    .eq('user_id', individualUserId)
+                    .single();
+
+                  match = {
+                    id: matchData.id,
+                    user_id: matchData.user_id,
+                    target_user_id: matchData.target_user_id,
+                    team_id: matchData.team_id,
+                    match_type: matchData.match_type as 'team_to_individual' | 'individual_to_team',
+                    status: matchData.status as 'pending' | 'matched' | 'rejected' | 'accepted',
+                    team: teamData ? { id: teamData.id, name: teamData.name } : undefined,
+                    individual_profile: individualProfile ? {
+                      id: individualProfile.user_id,
+                      name: individualProfile.name,
+                      avatar: individualProfile.avatar || '',
+                      program: individualProfile.program,
+                    } : undefined,
+                  };
+
+                  // Set other_user based on the individual in the request
+                  if (individualProfile) {
+                    otherUser = {
+                      id: individualProfile.user_id,
+                      name: individualProfile.name,
+                      avatar: individualProfile.avatar || '',
+                    };
+                  }
+
+                  if (teamData) {
+                    team = { id: teamData.id, name: teamData.name };
+                  }
+                }
+              } else if (conv.type === 'direct') {
+                // Regular direct conversation
                 const { data: participants } = await supabase
                   .from('conversation_participants')
                   .select('user_id')
@@ -63,32 +171,50 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
                     .eq('user_id', otherUserId)
                     .single();
 
-                  return {
-                    ...conv,
-                    type: conv.type as 'direct' | 'team',
-                    other_user: profile ? {
+                  if (profile) {
+                    otherUser = {
                       id: profile.user_id,
                       name: profile.name,
                       avatar: profile.avatar || '',
-                    } : undefined,
-                  };
+                    };
+                  }
+                }
+              } else if (conv.type === 'team' && conv.team_id) {
+                // Team conversation
+                const { data: teamData } = await supabase
+                  .from('teams')
+                  .select('id, name')
+                  .eq('id', conv.team_id)
+                  .single();
+
+                if (teamData) {
+                  team = { id: teamData.id, name: teamData.name };
                 }
               }
-              return { ...conv, type: conv.type as 'direct' | 'team' };
+
+              return {
+                ...conv,
+                type: conv.type as 'direct' | 'team',
+                other_user: otherUser,
+                team,
+                match,
+              };
             })
           );
 
-          setConversations(conversationsWithUsers);
+          setConversations(conversationsWithDetails);
+        } else {
+          setConversations([]);
         }
 
-        // Fetch matches where both users have swiped right
+        // Fetch individual matches (for the Matches tab)
         const { data: matchData } = await supabase
           .from('matches')
           .select('*')
           .or(`user_id.eq.${currentUserId},target_user_id.eq.${currentUserId}`)
-          .eq('status', 'matched');
+          .eq('status', 'matched')
+          .eq('match_type', 'individual');
 
-        // Get profiles for matched users
         const matchesWithProfiles: Match[] = await Promise.all(
           (matchData || []).map(async (match) => {
             const otherUserId = match.user_id === currentUserId 
@@ -103,7 +229,8 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
 
             return {
               ...match,
-              status: match.status as 'pending' | 'matched' | 'rejected',
+              match_type: match.match_type as 'individual' | 'team_to_individual' | 'individual_to_team',
+              status: match.status as 'pending' | 'matched' | 'rejected' | 'accepted',
               target_profile: profile ? {
                 id: profile.user_id,
                 name: profile.name,
@@ -123,7 +250,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
     };
 
     fetchData();
-  }, [isOpen, currentUserId]);
+  }, [isOpen, currentUserId, fetchUserTeams]);
 
   // Subscribe to new messages when in a conversation
   useEffect(() => {
@@ -142,7 +269,6 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
         async (payload) => {
           const newMessage = payload.new as Message;
           
-          // Fetch sender info
           const { data: profile } = await supabase
             .from('profiles')
             .select('name, avatar')
@@ -173,7 +299,6 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
 
       if (error) throw error;
 
-      // Fetch sender profiles
       const senderIds = [...new Set(data?.map((m) => m.sender_id) || [])];
       const { data: profiles } = await supabase
         .from('profiles')
@@ -200,12 +325,12 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
+    setJoinRequestMatch(conversation.match || null);
     fetchMessages(conversation.id);
     setView('room');
   };
 
   const handleStartChat = async (match: Match) => {
-    // Check if conversation already exists
     const existingConv = conversations.find(
       (c) =>
         c.type === 'direct' &&
@@ -217,7 +342,6 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
       return;
     }
 
-    // Create new conversation
     try {
       setIsLoading(true);
 
@@ -229,7 +353,6 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
 
       if (convError) throw convError;
 
-      // Add participants
       const { error: partError } = await supabase
         .from('conversation_participants')
         .insert([
@@ -239,7 +362,6 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
 
       if (partError) throw partError;
 
-      // Create conversation object with other user info
       const newConversation: Conversation = {
         id: conversation.id,
         type: conversation.type as 'direct' | 'team',
@@ -266,7 +388,6 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
   const handleSendMessage = async (content: string) => {
     if (!selectedConversation) return;
 
-    // Validate message input
     const validation = validateInput(messageSchema, {
       content,
       conversationId: selectedConversation.id,
@@ -292,15 +413,111 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
     }
   };
 
+  const handleAcceptRequest = async () => {
+    if (!joinRequestMatch) return;
+
+    try {
+      // Update match status
+      const { error: matchError } = await supabase
+        .from('matches')
+        .update({ status: 'accepted' })
+        .eq('id', joinRequestMatch.id);
+
+      if (matchError) throw matchError;
+
+      // Determine who to add to the team
+      const userToAdd = joinRequestMatch.match_type === 'team_to_individual'
+        ? joinRequestMatch.target_user_id
+        : joinRequestMatch.user_id;
+
+      // Add user to team
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert({
+          team_id: joinRequestMatch.team_id,
+          user_id: userToAdd,
+          role: 'member',
+          status: 'confirmed',
+        });
+
+      if (memberError) throw memberError;
+
+      // Add user to team conversation
+      const { data: teamConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('team_id', joinRequestMatch.team_id)
+        .eq('type', 'team')
+        .maybeSingle();
+
+      if (teamConv) {
+        await supabase
+          .from('conversation_participants')
+          .insert({
+            conversation_id: teamConv.id,
+            user_id: userToAdd,
+          });
+      }
+
+      // Update local state
+      setJoinRequestMatch({ ...joinRequestMatch, status: 'accepted' });
+      
+      // Update conversation in list
+      setConversations(prev => prev.map(c => 
+        c.id === selectedConversation?.id 
+          ? { ...c, match: { ...joinRequestMatch, status: 'accepted' as const } }
+          : c
+      ));
+
+      toast.success('Member added to team!');
+      onMemberAdded?.();
+    } catch (error) {
+      console.error('Error accepting request:', error);
+      toast.error('Failed to accept request');
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!joinRequestMatch) return;
+
+    try {
+      const { error } = await supabase
+        .from('matches')
+        .update({ status: 'rejected' })
+        .eq('id', joinRequestMatch.id);
+
+      if (error) throw error;
+
+      setJoinRequestMatch({ ...joinRequestMatch, status: 'rejected' });
+      
+      setConversations(prev => prev.map(c => 
+        c.id === selectedConversation?.id 
+          ? { ...c, match: { ...joinRequestMatch, status: 'rejected' as const } }
+          : c
+      ));
+
+      toast.info('Request declined');
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Failed to decline request');
+    }
+  };
+
   const handleBack = () => {
     if (view === 'room') {
       setView('list');
       setSelectedConversation(null);
+      setJoinRequestMatch(null);
       setMessages([]);
     } else {
       onClose();
     }
   };
+
+  // Check if current user is a team member for the selected conversation's match
+  const isTeamMember = joinRequestMatch 
+    ? userTeamIds.includes(joinRequestMatch.team_id)
+    : false;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -326,6 +543,10 @@ export const ChatModal = ({ isOpen, onClose, currentUserId }: ChatModalProps) =>
             onBack={handleBack}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
+            joinRequestMatch={joinRequestMatch || undefined}
+            isTeamMember={isTeamMember}
+            onAcceptRequest={handleAcceptRequest}
+            onRejectRequest={handleRejectRequest}
           />
         ) : null}
       </DialogContent>
