@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserProfile } from '@/types';
 import { programColors, studioInfo } from '@/data/mockData';
@@ -14,7 +15,8 @@ interface ProfileDetailModalProps {
   showActions?: boolean;
 }
 
-export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass, showActions = true }: ProfileDetailModalProps) => {
+export const ProfileDetailModal = forwardRef<HTMLDivElement, ProfileDetailModalProps>(
+  ({ profile, isOpen, onClose, onLike, onPass, showActions = true }, ref) => {
   if (!profile) return null;
 
   const studioPrefs = profile.studioPreferences || [profile.studioPreference];
@@ -178,4 +180,6 @@ export const ProfileDetailModal = ({ profile, isOpen, onClose, onLike, onPass, s
       )}
     </AnimatePresence>
   );
-};
+});
+
+ProfileDetailModal.displayName = 'ProfileDetailModal';

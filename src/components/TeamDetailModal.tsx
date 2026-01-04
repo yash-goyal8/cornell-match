@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Team, UserProfile } from '@/types';
 import { programColors, studioInfo } from '@/data/mockData';
@@ -22,7 +22,8 @@ const studioIcons = {
   pitech: Heart,
 };
 
-export const TeamDetailModal = ({ team, isOpen, onClose, onJoin, onPass }: TeamDetailModalProps) => {
+export const TeamDetailModal = forwardRef<HTMLDivElement, TeamDetailModalProps>(
+  ({ team, isOpen, onClose, onJoin, onPass }, ref) => {
   const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
 
@@ -212,4 +213,6 @@ export const TeamDetailModal = ({ team, isOpen, onClose, onJoin, onPass }: TeamD
       )}
     </AnimatePresence>
   );
-};
+});
+
+TeamDetailModal.displayName = 'TeamDetailModal';
