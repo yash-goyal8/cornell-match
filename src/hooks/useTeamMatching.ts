@@ -126,6 +126,25 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
   // Accept a join request - adds user to team
   const acceptJoinRequest = useCallback(async (matchId: string, teamId: string, userId: string) => {
     try {
+      // Check if user is already a team member (prevent duplicates)
+      const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', userId)
+        .eq('status', 'confirmed')
+        .maybeSingle();
+
+      if (existingMember) {
+        toast.error('This user is already a team member');
+        // Still update the match status
+        await supabase
+          .from('matches')
+          .update({ status: 'accepted' })
+          .eq('id', matchId);
+        return true;
+      }
+
       // Update match status
       const { error: matchError } = await supabase
         .from('matches')
@@ -146,7 +165,7 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
 
       if (memberError) throw memberError;
 
-      // Add user to team conversation
+      // Add user to team conversation (with duplicate check)
       const { data: teamConv } = await supabase
         .from('conversations')
         .select('id')
@@ -155,12 +174,22 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
         .maybeSingle();
 
       if (teamConv) {
-        await supabase
+        // Check if already a participant
+        const { data: existingParticipant } = await supabase
           .from('conversation_participants')
-          .insert({
-            conversation_id: teamConv.id,
-            user_id: userId,
-          });
+          .select('id')
+          .eq('conversation_id', teamConv.id)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (!existingParticipant) {
+          await supabase
+            .from('conversation_participants')
+            .insert({
+              conversation_id: teamConv.id,
+              user_id: userId,
+            });
+        }
       }
 
       toast.success('Member added to team!');

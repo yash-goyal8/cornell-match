@@ -417,6 +417,32 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
     if (!joinRequestMatch) return;
 
     try {
+      // Determine who to add to the team
+      const userToAdd = joinRequestMatch.match_type === 'team_to_individual'
+        ? joinRequestMatch.target_user_id
+        : joinRequestMatch.user_id;
+
+      // Check if user is already a team member (prevent duplicates)
+      const { data: existingMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', joinRequestMatch.team_id)
+        .eq('user_id', userToAdd)
+        .eq('status', 'confirmed')
+        .maybeSingle();
+
+      if (existingMember) {
+        toast.error('This user is already a team member');
+        // Still update the match status to accepted
+        await supabase
+          .from('matches')
+          .update({ status: 'accepted' })
+          .eq('id', joinRequestMatch.id);
+        
+        setJoinRequestMatch({ ...joinRequestMatch, status: 'accepted' });
+        return;
+      }
+
       // Update match status
       const { error: matchError } = await supabase
         .from('matches')
@@ -424,11 +450,6 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
         .eq('id', joinRequestMatch.id);
 
       if (matchError) throw matchError;
-
-      // Determine who to add to the team
-      const userToAdd = joinRequestMatch.match_type === 'team_to_individual'
-        ? joinRequestMatch.target_user_id
-        : joinRequestMatch.user_id;
 
       // Add user to team
       const { error: memberError } = await supabase
@@ -442,7 +463,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
 
       if (memberError) throw memberError;
 
-      // Add user to team conversation
+      // Add user to team conversation (check for duplicates)
       const { data: teamConv } = await supabase
         .from('conversations')
         .select('id')
@@ -451,12 +472,22 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
         .maybeSingle();
 
       if (teamConv) {
-        await supabase
+        // Check if already a participant
+        const { data: existingParticipant } = await supabase
           .from('conversation_participants')
-          .insert({
-            conversation_id: teamConv.id,
-            user_id: userToAdd,
-          });
+          .select('id')
+          .eq('conversation_id', teamConv.id)
+          .eq('user_id', userToAdd)
+          .maybeSingle();
+
+        if (!existingParticipant) {
+          await supabase
+            .from('conversation_participants')
+            .insert({
+              conversation_id: teamConv.id,
+              user_id: userToAdd,
+            });
+        }
       }
 
       // Update local state

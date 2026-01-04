@@ -275,8 +275,53 @@ export const TeamManagementModal = ({
     try {
       const otherMembers = members.filter(m => m.id !== currentUserId);
       
+      // If this is the last member, delete the team instead
+      if (otherMembers.length === 0) {
+        // Delete team conversation if exists
+        const { data: conversation } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('team_id', team.id)
+          .eq('type', 'team')
+          .maybeSingle();
+
+        if (conversation) {
+          await supabase
+            .from('conversation_participants')
+            .delete()
+            .eq('conversation_id', conversation.id);
+          
+          await supabase
+            .from('messages')
+            .delete()
+            .eq('conversation_id', conversation.id);
+          
+          await supabase
+            .from('conversations')
+            .delete()
+            .eq('id', conversation.id);
+        }
+
+        // Delete team members (just this user)
+        await supabase
+          .from('team_members')
+          .delete()
+          .eq('team_id', team.id);
+
+        // Delete the team
+        await supabase
+          .from('teams')
+          .delete()
+          .eq('id', team.id);
+
+        toast.success('Team disbanded as you were the last member');
+        onClose();
+        onTeamDeleted?.();
+        return;
+      }
+      
       // If leaving member is admin and there are other members, reassign admin
-      if (currentMember.role === 'admin' && otherMembers.length > 0) {
+      if (currentMember.role === 'admin') {
         // Check if there's another admin
         const hasOtherAdmin = otherMembers.some(m => m.role === 'admin');
         
@@ -318,7 +363,7 @@ export const TeamManagementModal = ({
 
       toast.success('You have left the team');
       onClose();
-      onTeamDeleted?.(); // Refresh the teams list
+      onTeamDeleted?.();
     } catch (error) {
       console.error('Error leaving team:', error);
       toast.error('Failed to leave team');
@@ -576,7 +621,12 @@ export const TeamManagementModal = ({
                   <AlertDialogTitle>Leave Team?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Are you sure you want to leave "{team.name}"?
-                    {currentMember?.role === 'admin' && members.length > 1 && (
+                    {members.length === 1 ? (
+                      <>
+                        <br /><br />
+                        <strong>Since you're the last member, the team will be disbanded.</strong>
+                      </>
+                    ) : currentMember?.role === 'admin' && (
                       <>
                         <br /><br />
                         Since you're an admin, another member will be randomly assigned as the new admin.
