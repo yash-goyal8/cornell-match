@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Team, UserProfile, Program, Studio } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Users, Crown, MoreVertical, UserPlus, Shield, UserMinus, Loader2, MessageSquare, Trash2 } from 'lucide-react';
+import { Users, Crown, MoreVertical, UserPlus, Shield, UserMinus, Loader2, MessageSquare, Trash2, LogOut } from 'lucide-react';
 import { MemberProfileModal } from './MemberProfileModal';
 
 interface TeamMember extends UserProfile {
@@ -41,8 +41,13 @@ export const TeamManagementModal = ({
   const [addingMember, setAddingMember] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const isTeamOwner = team?.createdBy === currentUserId;
+  
+  // Check if current user is an admin
+  const currentMember = members.find(m => m.id === currentUserId);
+  const isAdmin = currentMember?.role === 'admin' || isTeamOwner;
   
   // Only team owner can manage members (enforced by RLS policies)
   // The 'admin' role in database is UI-only and doesn't grant actual database privileges
@@ -263,8 +268,67 @@ export const TeamManagementModal = ({
     }
   };
 
+  const handleLeaveTeam = async () => {
+    if (!team || !currentMember) return;
+    
+    setLeaving(true);
+    try {
+      const otherMembers = members.filter(m => m.id !== currentUserId);
+      
+      // If leaving member is admin and there are other members, reassign admin
+      if (currentMember.role === 'admin' && otherMembers.length > 0) {
+        // Check if there's another admin
+        const hasOtherAdmin = otherMembers.some(m => m.role === 'admin');
+        
+        if (!hasOtherAdmin) {
+          // Randomly pick another member to be admin
+          const randomMember = otherMembers[Math.floor(Math.random() * otherMembers.length)];
+          await supabase
+            .from('team_members')
+            .update({ role: 'admin' })
+            .eq('id', randomMember.memberId);
+          
+          toast.info(`${randomMember.name} is now the team admin`);
+        }
+      }
+      
+      // Remove from team_members
+      const { error: removeError } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', currentMember.memberId);
+
+      if (removeError) throw removeError;
+
+      // Remove from team conversation
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('team_id', team.id)
+        .eq('type', 'team')
+        .maybeSingle();
+
+      if (conversation) {
+        await supabase
+          .from('conversation_participants')
+          .delete()
+          .eq('conversation_id', conversation.id)
+          .eq('user_id', currentUserId);
+      }
+
+      toast.success('You have left the team');
+      onClose();
+      onTeamDeleted?.(); // Refresh the teams list
+    } catch (error) {
+      console.error('Error leaving team:', error);
+      toast.error('Failed to leave team');
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   const handleDeleteTeam = async () => {
-    if (!team || !isTeamOwner) return;
+    if (!team || !isAdmin) return;
     
     setDeleting(true);
     try {
@@ -489,9 +553,48 @@ export const TeamManagementModal = ({
             )}
           </div>
 
-          {/* Delete Team Section */}
-          {isTeamOwner && (
-            <div className="pt-4 border-t border-border">
+          {/* Team Actions Section */}
+          <div className="pt-4 border-t border-border space-y-2">
+            {/* Leave Team - available to all members */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  disabled={leaving}
+                >
+                  {leaving ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <LogOut className="w-4 h-4 mr-2" />
+                  )}
+                  Leave Team
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Leave Team?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to leave "{team.name}"?
+                    {currentMember?.role === 'admin' && members.length > 1 && (
+                      <>
+                        <br /><br />
+                        Since you're an admin, another member will be randomly assigned as the new admin.
+                      </>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleLeaveTeam}>
+                    Leave Team
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Team - only available to admins */}
+            {isAdmin && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
@@ -528,8 +631,8 @@ export const TeamManagementModal = ({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Member Profile Modal */}
