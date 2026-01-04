@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Users, ChevronLeft } from 'lucide-react';
+import { MessageCircle, Users, ChevronLeft, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Conversation, Match } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
@@ -81,51 +82,85 @@ export const ChatList = ({
                 <p className="text-sm mt-1">Match with someone to start chatting!</p>
               </div>
             ) : (
-              conversations.map((conversation) => (
-                <motion.button
-                  key={conversation.id}
-                  onClick={() => onSelectConversation(conversation)}
-                  className={cn(
-                    "w-full p-4 flex items-center gap-3 hover:bg-accent/50 transition-colors text-left",
-                    selectedId === conversation.id && "bg-accent"
-                  )}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage 
-                      src={conversation.type === 'direct' 
-                        ? conversation.other_user?.avatar 
-                        : undefined
-                      } 
-                    />
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {conversation.type === 'direct' 
-                        ? conversation.other_user?.name?.charAt(0) || '?'
-                        : <Users className="w-5 h-5" />
-                      }
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-foreground truncate">
-                      {conversation.type === 'direct' 
-                        ? conversation.other_user?.name 
-                        : conversation.team?.name
-                      }
-                    </h3>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conversation.last_message?.content || 'No messages yet'}
-                    </p>
-                  </div>
-                  {conversation.last_message && (
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(conversation.last_message.created_at).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </span>
-                  )}
-                </motion.button>
-              ))
+              conversations.map((conversation) => {
+                const isJoinRequest = !!conversation.match;
+                const isPending = conversation.match?.status === 'pending';
+                
+                // Determine display name
+                let displayName = '';
+                let displayAvatar = '';
+                
+                if (isJoinRequest && conversation.match) {
+                  // For join requests, show the individual's name with team context
+                  displayName = conversation.match.individual_profile?.name || 'Unknown';
+                  displayAvatar = conversation.match.individual_profile?.avatar || '';
+                } else if (conversation.type === 'direct') {
+                  displayName = conversation.other_user?.name || 'Unknown';
+                  displayAvatar = conversation.other_user?.avatar || '';
+                } else {
+                  displayName = conversation.team?.name || 'Team Chat';
+                }
+                
+                return (
+                  <motion.button
+                    key={conversation.id}
+                    onClick={() => onSelectConversation(conversation)}
+                    className={cn(
+                      "w-full p-4 flex items-center gap-3 hover:bg-accent/50 transition-colors text-left",
+                      selectedId === conversation.id && "bg-accent"
+                    )}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <div className="relative">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={displayAvatar} />
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {conversation.type === 'team' && !isJoinRequest
+                            ? <Users className="w-5 h-5" />
+                            : displayName?.charAt(0) || '?'
+                          }
+                        </AvatarFallback>
+                      </Avatar>
+                      {isJoinRequest && (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                          <UserPlus className="w-3 h-3 text-primary-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-foreground truncate">
+                          {displayName}
+                        </h3>
+                        {isJoinRequest && isPending && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            Request
+                          </Badge>
+                        )}
+                        {conversation.match?.status === 'accepted' && (
+                          <Badge className="text-[10px] px-1.5 py-0 bg-green-500/20 text-green-600 dark:text-green-400">
+                            Joined
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {isJoinRequest && conversation.match?.team
+                          ? `${conversation.match.match_type === 'team_to_individual' ? 'Invited by' : 'Wants to join'} ${conversation.match.team.name}`
+                          : conversation.last_message?.content || 'No messages yet'
+                        }
+                      </p>
+                    </div>
+                    {conversation.last_message && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(conversation.last_message.created_at).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    )}
+                  </motion.button>
+                );
+              })
             )}
           </div>
         ) : (

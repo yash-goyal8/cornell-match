@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Message, Conversation } from '@/types/chat';
+import { Message, Conversation, JoinRequestMatch } from '@/types/chat';
+import { JoinRequestBanner } from './JoinRequestBanner';
 import { cn } from '@/lib/utils';
 
 interface ChatRoomProps {
@@ -15,6 +16,11 @@ interface ChatRoomProps {
   onBack: () => void;
   onSendMessage: (content: string) => void;
   isLoading?: boolean;
+  // Join request specific props
+  joinRequestMatch?: JoinRequestMatch;
+  isTeamMember?: boolean;
+  onAcceptRequest?: () => Promise<void>;
+  onRejectRequest?: () => Promise<void>;
 }
 
 export const ChatRoom = ({
@@ -24,6 +30,10 @@ export const ChatRoom = ({
   onBack,
   onSendMessage,
   isLoading,
+  joinRequestMatch,
+  isTeamMember = false,
+  onAcceptRequest,
+  onRejectRequest,
 }: ChatRoomProps) => {
   const [newMessage, setNewMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -94,6 +104,17 @@ export const ChatRoom = ({
           )}
         </div>
       </div>
+
+      {/* Join Request Banner */}
+      {joinRequestMatch && onAcceptRequest && onRejectRequest && (
+        <JoinRequestBanner
+          match={joinRequestMatch}
+          currentUserId={currentUserId}
+          isTeamMember={isTeamMember}
+          onAccept={onAcceptRequest}
+          onReject={onRejectRequest}
+        />
+      )}
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
