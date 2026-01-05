@@ -18,23 +18,37 @@ const Auth = () => {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // Check if already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/');
-      }
+    // Check for recovery token in URL hash first
+    const hash = window.location.hash;
+    const isRecoveryFlow = hash && (hash.includes('type=recovery') || hash.includes('type=magiclink'));
+    
+    if (isRecoveryFlow) {
+      // Don't redirect, wait for PASSWORD_RECOVERY event
       setCheckingAuth(false);
-    });
+    } else {
+      // Check if already logged in (only if not recovery flow)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          navigate('/');
+        }
+        setCheckingAuth(false);
+      });
+    }
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth event:', event);
       if (event === 'PASSWORD_RECOVERY') {
         // User clicked the password reset link - show update password form
         setMode('update-password');
         setCheckingAuth(false);
         return;
       }
-      if (session && mode !== 'update-password') {
+      if (event === 'SIGNED_IN' && mode === 'update-password') {
+        // Stay on update password form after password is updated
+        return;
+      }
+      if (session && mode !== 'update-password' && !isRecoveryFlow) {
         navigate('/');
       }
     });
