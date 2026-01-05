@@ -167,10 +167,6 @@ const Auth = () => {
           </div>
         </div>
 
-        {/* Testing hint */}
-        <p className="text-xs text-muted-foreground text-center mt-4">
-          To test messaging: Create 2 accounts in 2 browser tabs
-        </p>
       </motion.div>
     </div>
   );
