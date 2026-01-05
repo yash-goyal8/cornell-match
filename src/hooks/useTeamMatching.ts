@@ -10,6 +10,67 @@ interface UseTeamMatchingProps {
 }
 
 export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTeamMatchingProps) => {
+  // Individual swipes right on another individual - creates match and conversation
+  const createIndividualToIndividualMatch = useCallback(async (targetProfile: UserProfile) => {
+    try {
+      // Create match record
+      const { data: match, error: matchError } = await supabase
+        .from('matches')
+        .insert({
+          user_id: currentUserId,
+          target_user_id: targetProfile.id,
+          match_type: 'individual_to_individual',
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (matchError) throw matchError;
+
+      // Create a conversation for them to chat
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .insert({
+          type: 'direct',
+          match_id: match.id,
+        })
+        .select()
+        .single();
+
+      if (convError) throw convError;
+
+      // Add both users to the conversation
+      const { error: partError1 } = await supabase
+        .from('conversation_participants')
+        .insert({
+          conversation_id: conversation.id,
+          user_id: currentUserId,
+        });
+
+      if (partError1) throw partError1;
+
+      const { error: partError2 } = await supabase
+        .from('conversation_participants')
+        .insert({
+          conversation_id: conversation.id,
+          user_id: targetProfile.id,
+        });
+
+      if (partError2) throw partError2;
+
+      toast.success(`Interest sent to ${targetProfile.name}!`, {
+        description: "You can now chat with them in Messages.",
+      });
+
+      onMatchCreated?.();
+      return { match, conversation };
+    } catch (error) {
+      console.error('Error creating individual match:', error);
+      toast.error('Failed to send interest');
+      return null;
+    }
+  }, [currentUserId, onMatchCreated]);
+
   // Team swipes right on an individual - creates a join request
   const createTeamToIndividualMatch = useCallback(async (targetProfile: UserProfile) => {
     if (!myTeam) {
@@ -221,6 +282,7 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
   }, []);
 
   return {
+    createIndividualToIndividualMatch,
     createTeamToIndividualMatch,
     createIndividualToTeamMatch,
     acceptJoinRequest,

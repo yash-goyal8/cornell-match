@@ -55,7 +55,7 @@ const Index = () => {
     teamSize: null,
   });
 
-  // Fetch profiles of users NOT in any team (excluding current user)
+  // Fetch profiles of users NOT in any team and NOT already swiped (excluding current user)
   useEffect(() => {
     const fetchProfiles = async () => {
       if (!user) return;
@@ -74,6 +74,19 @@ const Index = () => {
 
         const usersInTeams = new Set((teamMembers || []).map((tm) => tm.user_id));
 
+        // Get all users that the current user has already swiped on
+        const { data: swipedMatches, error: matchesError } = await supabase
+          .from("matches")
+          .select("target_user_id")
+          .eq("user_id", user.id)
+          .in("match_type", ["individual_to_individual", "team_to_individual"]);
+
+        if (matchesError) {
+          console.error("Error fetching swiped matches:", matchesError);
+        }
+
+        const swipedUserIds = new Set((swipedMatches || []).map((m) => m.target_user_id));
+
         // Fetch all profiles except current user
         const { data, error } = await supabase.from("profiles").select("*").neq("user_id", user.id);
 
@@ -83,12 +96,14 @@ const Index = () => {
           return;
         }
 
-        // Filter out users who are already in a team
-        const availableProfiles = (data || []).filter((p) => !usersInTeams.has(p.user_id));
+        // Filter out users who are already in a team OR already swiped
+        const availableProfiles = (data || []).filter(
+          (p) => !usersInTeams.has(p.user_id) && !swipedUserIds.has(p.user_id)
+        );
 
         // Transform database profiles to UserProfile format
         const transformedProfiles: UserProfile[] = availableProfiles.map((p) => ({
-          id: p.id,
+          id: p.user_id, // Use user_id as id for matching purposes
           name: p.name,
           program: p.program as Program,
           skills: p.skills || [],
@@ -112,13 +127,27 @@ const Index = () => {
     }
   }, [user, profile]);
 
-  // Fetch real teams with their members from database
+  // Fetch real teams with their members from database (excluding already swiped)
   useEffect(() => {
     const fetchTeams = async () => {
       if (!user) return;
 
       setLoadingTeams(true);
       try {
+        // Get teams the user has already swiped on
+        const { data: swipedTeams, error: swipedError } = await supabase
+          .from("matches")
+          .select("team_id")
+          .eq("user_id", user.id)
+          .eq("match_type", "individual_to_team")
+          .not("team_id", "is", null);
+
+        if (swipedError) {
+          console.error("Error fetching swiped teams:", swipedError);
+        }
+
+        const swipedTeamIds = new Set((swipedTeams || []).map((m) => m.team_id));
+
         // Fetch all teams
         const { data: teamsData, error: teamsError } = await supabase.from("teams").select("*");
 
@@ -133,6 +162,9 @@ const Index = () => {
           return;
         }
 
+        // Filter out already swiped teams and teams user is a member of
+        const availableTeamsData = teamsData.filter((t) => !swipedTeamIds.has(t.id));
+
         // Fetch all team members
         const { data: membersData, error: membersError } = await supabase
           .from("team_members")
@@ -142,6 +174,16 @@ const Index = () => {
         if (membersError) {
           console.error("Error fetching team members:", membersError);
         }
+
+        // Check which teams the user is a member of
+        const userTeamIds = new Set(
+          (membersData || [])
+            .filter((m) => m.user_id === user.id)
+            .map((m) => m.team_id)
+        );
+
+        // Filter out teams the user is already a member of
+        const filteredTeamsData = availableTeamsData.filter((t) => !userTeamIds.has(t.id));
 
         // Fetch profiles for all team members
         const memberUserIds = (membersData || []).map((m) => m.user_id);
@@ -185,7 +227,7 @@ const Index = () => {
         });
 
         // Transform teams data
-        const transformedTeams: Team[] = teamsData.map((t) => ({
+        const transformedTeams: Team[] = filteredTeamsData.map((t) => ({
           id: t.id,
           name: t.name,
           description: t.description || "",
@@ -222,7 +264,7 @@ const Index = () => {
   const [myTeam, setMyTeam] = useState<Team | null>(null);
 
   // Team matching hook
-  const { createTeamToIndividualMatch, createIndividualToTeamMatch } = useTeamMatching({
+  const { createIndividualToIndividualMatch, createTeamToIndividualMatch, createIndividualToTeamMatch } = useTeamMatching({
     currentUserId: user?.id || '',
     myTeam,
     onMatchCreated: () => {
@@ -498,23 +540,29 @@ const Index = () => {
         if (myTeam) {
           await createTeamToIndividualMatch(currentUserProfile);
         } else {
-          // Individual to individual matching (original behavior)
-          if (Math.random() < 0.3) {
-            setMatches((prev) => [...prev, currentUserProfile.id]);
-            toast.success(`It's a match! 🎉`, {
-              description: `You and ${currentUserProfile.name} both expressed interest!`,
+          // Individual to individual matching - create match and conversation
+          await createIndividualToIndividualMatch(currentUserProfile);
+        }
+      } else {
+        // Left swipe - still record it so they don't see this person again
+        // We'll create a match record with status 'rejected' for filtering
+        try {
+          await supabase
+            .from('matches')
+            .insert({
+              user_id: user?.id,
+              target_user_id: currentUserProfile.id,
+              match_type: 'individual_to_individual',
+              status: 'rejected',
             });
-          } else {
-            toast.info(`Interest sent to ${currentUserProfile.name}`, {
-              description: "You'll be notified if they're interested too!",
-            });
-          }
+        } catch (error) {
+          console.error('Error recording pass:', error);
         }
       }
 
       setUsers((prev) => prev.slice(1));
     },
-    [users, myTeam, createTeamToIndividualMatch],
+    [users, myTeam, createTeamToIndividualMatch, createIndividualToIndividualMatch, user],
   );
 
   const handleTeamSwipe = useCallback(
@@ -528,49 +576,108 @@ const Index = () => {
       if (direction === "right") {
         // Individual swipes on team - create individual-to-team match
         await createIndividualToTeamMatch(currentTeam);
+      } else {
+        // Left swipe - record it so they don't see this team again
+        try {
+          await supabase
+            .from('matches')
+            .insert({
+              user_id: user?.id,
+              target_user_id: currentTeam.createdBy,
+              team_id: currentTeam.id,
+              match_type: 'individual_to_team',
+              status: 'rejected',
+            });
+        } catch (error) {
+          console.error('Error recording team pass:', error);
+        }
       }
 
       setTeams((prev) => prev.slice(1));
     },
-    [teams, createIndividualToTeamMatch],
+    [teams, createIndividualToTeamMatch, user],
   );
 
-  const handleUndo = useCallback(() => {
+  const handleUndo = useCallback(async () => {
     if (history.length === 0) return;
 
     const lastAction = history[history.length - 1];
 
     if (lastAction.type === "user" && activeTab === "individuals") {
-      setUsers((prev) => [lastAction.item as UserProfile, ...prev]);
+      const profile = lastAction.item as UserProfile;
+      setUsers((prev) => [profile, ...prev]);
       if (lastAction.direction === "right") {
-        setMatches((prev) => prev.filter((id) => id !== (lastAction.item as UserProfile).id));
+        setMatches((prev) => prev.filter((id) => id !== profile.id));
+      }
+      // Delete the match record from database
+      try {
+        await supabase
+          .from('matches')
+          .delete()
+          .eq('user_id', user?.id)
+          .eq('target_user_id', profile.id);
+      } catch (error) {
+        console.error('Error deleting match:', error);
       }
       toast.info("Undid last swipe");
     } else if (lastAction.type === "team" && activeTab === "teams") {
-      setTeams((prev) => [lastAction.item as Team, ...prev]);
+      const team = lastAction.item as Team;
+      setTeams((prev) => [team, ...prev]);
+      // Delete the match record from database
+      try {
+        await supabase
+          .from('matches')
+          .delete()
+          .eq('user_id', user?.id)
+          .eq('team_id', team.id);
+      } catch (error) {
+        console.error('Error deleting team match:', error);
+      }
       toast.info("Undid last swipe");
     }
 
     setHistory((prev) => prev.slice(0, -1));
-  }, [history, activeTab]);
+  }, [history, activeTab, user]);
 
   // Undo a specific action by index (from Activity modal)
-  const handleUndoByIndex = useCallback((index: number) => {
+  const handleUndoByIndex = useCallback(async (index: number) => {
     const action = history[index];
     if (!action) return;
 
     if (action.type === "user") {
-      setUsers((prev) => [action.item as UserProfile, ...prev]);
+      const profile = action.item as UserProfile;
+      setUsers((prev) => [profile, ...prev]);
       if (action.direction === "right") {
-        setMatches((prev) => prev.filter((id) => id !== (action.item as UserProfile).id));
+        setMatches((prev) => prev.filter((id) => id !== profile.id));
+      }
+      // Delete the match record from database
+      try {
+        await supabase
+          .from('matches')
+          .delete()
+          .eq('user_id', user?.id)
+          .eq('target_user_id', profile.id);
+      } catch (error) {
+        console.error('Error deleting match:', error);
       }
     } else if (action.type === "team") {
-      setTeams((prev) => [action.item as Team, ...prev]);
+      const team = action.item as Team;
+      setTeams((prev) => [team, ...prev]);
+      // Delete the match record from database
+      try {
+        await supabase
+          .from('matches')
+          .delete()
+          .eq('user_id', user?.id)
+          .eq('team_id', team.id);
+      } catch (error) {
+        console.error('Error deleting team match:', error);
+      }
     }
 
     setHistory((prev) => prev.filter((_, i) => i !== index));
     toast.info("Action undone");
-  }, [history]);
+  }, [history, user]);
 
   const handleProfileTap = (profile: UserProfile) => {
     setSelectedProfile(profile);
