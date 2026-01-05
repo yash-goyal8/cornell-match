@@ -538,10 +538,16 @@ const Index = () => {
       if (direction === "right") {
         // If user is part of a team, create team-to-individual match
         if (myTeam) {
-          await createTeamToIndividualMatch(currentUserProfile);
+          const result = await createTeamToIndividualMatch(currentUserProfile);
+          if (result) {
+            setIsChatOpen(true);
+          }
         } else {
           // Individual to individual matching - create match and conversation
-          await createIndividualToIndividualMatch(currentUserProfile);
+          const result = await createIndividualToIndividualMatch(currentUserProfile);
+          if (result) {
+            setIsChatOpen(true);
+          }
         }
       } else {
         // Left swipe - still record it so they don't see this person again
@@ -575,7 +581,10 @@ const Index = () => {
 
       if (direction === "right") {
         // Individual swipes on team - create individual-to-team match
-        await createIndividualToTeamMatch(currentTeam);
+        const result = await createIndividualToTeamMatch(currentTeam);
+        if (result) {
+          setIsChatOpen(true);
+        }
       } else {
         // Left swipe - record it so they don't see this team again
         try {
