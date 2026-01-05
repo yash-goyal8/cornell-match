@@ -10,9 +10,10 @@ import { Loader2, Users, ArrowLeft } from 'lucide-react';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'update-password'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
@@ -27,16 +28,51 @@ const Auth = () => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+      if (event === 'PASSWORD_RECOVERY') {
+        // User clicked the password reset link - show update password form
+        setMode('update-password');
+        setCheckingAuth(false);
+        return;
+      }
+      if (session && mode !== 'update-password') {
         navigate('/');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (mode === 'update-password') {
+      if (!password) {
+        toast.error('Please enter a new password');
+        return;
+      }
+      if (password.length < 6) {
+        toast.error('Password must be at least 6 characters');
+        return;
+      }
+      if (password !== confirmPassword) {
+        toast.error('Passwords do not match');
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        toast.success('Password updated successfully!');
+        navigate('/');
+      } catch (error: any) {
+        console.error('Password update error:', error);
+        toast.error(error.message || 'Failed to update password');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     
     if (!email) {
       toast.error('Please enter your email');
@@ -97,10 +133,10 @@ const Auth = () => {
 
   // Handle password reset from email link
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('reset') === 'true') {
-      // User clicked the reset link in email, they should now be able to update password
-      toast.info('You can now set a new password after logging in');
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      // Supabase recovery link detected - the onAuthStateChange will handle it
+      setCheckingAuth(true);
     }
   }, []);
 
@@ -116,6 +152,7 @@ const Auth = () => {
     switch (mode) {
       case 'forgot': return 'Reset Password';
       case 'signup': return 'Create Account';
+      case 'update-password': return 'Set New Password';
       default: return 'Welcome Back';
     }
   };
@@ -124,6 +161,7 @@ const Auth = () => {
     switch (mode) {
       case 'forgot': return 'Send Reset Email';
       case 'signup': return 'Sign Up';
+      case 'update-password': return 'Update Password';
       default: return 'Sign In';
     }
   };
@@ -148,7 +186,7 @@ const Auth = () => {
 
         {/* Auth Form */}
         <div className="glass rounded-2xl p-6">
-          {mode === 'forgot' && (
+          {(mode === 'forgot' || mode === 'update-password') && (
             <button
               type="button"
               onClick={() => setMode('login')}
@@ -169,28 +207,50 @@ const Auth = () => {
             </p>
           )}
 
+          {mode === 'update-password' && (
+            <p className="text-sm text-muted-foreground text-center mb-4">
+              Enter your new password below.
+            </p>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@cornell.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
+            {mode !== 'update-password' && (
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@cornell.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
 
             {mode !== 'forgot' && (
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{mode === 'update-password' ? 'New Password' : 'Password'}</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {mode === 'update-password' && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
                 />
               </div>
@@ -221,7 +281,7 @@ const Auth = () => {
             </Button>
           </form>
 
-          {mode !== 'forgot' && (
+          {(mode === 'login' || mode === 'signup') && (
             <div className="mt-6 text-center">
               <button
                 type="button"
