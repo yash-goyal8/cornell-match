@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Loader2, Users } from 'lucide-react';
+import { Loader2, Users, ArrowLeft } from 'lucide-react';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,12 +38,17 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
-      toast.error('Please fill in all fields');
+    if (!email) {
+      toast.error('Please enter your email');
       return;
     }
 
-    if (password.length < 6) {
+    if (mode !== 'forgot' && !password) {
+      toast.error('Please enter your password');
+      return;
+    }
+
+    if (mode !== 'forgot' && password.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
     }
@@ -51,7 +56,14 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth?reset=true`,
+        });
+        if (error) throw error;
+        toast.success('Password reset email sent! Check your inbox.');
+        setMode('login');
+      } else if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -83,6 +95,15 @@ const Auth = () => {
     }
   };
 
+  // Handle password reset from email link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reset') === 'true') {
+      // User clicked the reset link in email, they should now be able to update password
+      toast.info('You can now set a new password after logging in');
+    }
+  }, []);
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -90,6 +111,22 @@ const Auth = () => {
       </div>
     );
   }
+
+  const getTitle = () => {
+    switch (mode) {
+      case 'forgot': return 'Reset Password';
+      case 'signup': return 'Create Account';
+      default: return 'Welcome Back';
+    }
+  };
+
+  const getButtonText = () => {
+    switch (mode) {
+      case 'forgot': return 'Send Reset Email';
+      case 'signup': return 'Sign Up';
+      default: return 'Sign In';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -111,9 +148,26 @@ const Auth = () => {
 
         {/* Auth Form */}
         <div className="glass rounded-2xl p-6">
+          {mode === 'forgot' && (
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to login
+            </button>
+          )}
+          
           <h2 className="text-xl font-semibold text-foreground mb-6 text-center">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            {getTitle()}
           </h2>
+
+          {mode === 'forgot' && (
+            <p className="text-sm text-muted-foreground text-center mb-4">
+              Enter your email and we'll send you a link to reset your password.
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -128,17 +182,32 @@ const Auth = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
-            </div>
+            {mode !== 'forgot' && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
+            {mode === 'login' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setMode('forgot')}
+                  className="text-sm text-primary hover:underline"
+                  disabled={loading}
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
             <Button
               type="submit"
@@ -148,23 +217,25 @@ const Auth = () => {
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
-              {isLogin ? 'Sign In' : 'Sign Up'}
+              {getButtonText()}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              disabled={loading}
-            >
-              {isLogin ? "Don't have an account? " : 'Already have an account? '}
-              <span className="text-primary font-medium">
-                {isLogin ? 'Sign Up' : 'Sign In'}
-              </span>
-            </button>
-          </div>
+          {mode !== 'forgot' && (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                disabled={loading}
+              >
+                {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+                <span className="text-primary font-medium">
+                  {mode === 'login' ? 'Sign Up' : 'Sign In'}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
 
       </motion.div>
