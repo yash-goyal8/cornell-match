@@ -44,51 +44,47 @@ const Index = () => {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
 
-  // Fetch unread message count
+  // Fetch unread message count - optimized single query approach
   useEffect(() => {
     const fetchUnreadCount = async () => {
       if (!user) return;
 
-      // Get all conversations the user is part of
-      const { data: participations } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', user.id);
+      // Get conversations, reads, and messages in parallel
+      const [participationsRes, readsRes] = await Promise.all([
+        supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', user.id),
+        supabase
+          .from('message_reads')
+          .select('conversation_id, last_read_at')
+          .eq('user_id', user.id)
+      ]);
 
+      const participations = participationsRes.data;
       if (!participations || participations.length === 0) {
         setUnreadCount(0);
         return;
       }
 
       const conversationIds = participations.map(p => p.conversation_id);
+      const readMap = new Map(readsRes.data?.map(r => [r.conversation_id, r.last_read_at]) || []);
 
-      // Get last read times for each conversation
-      const { data: reads } = await supabase
-        .from('message_reads')
-        .select('conversation_id, last_read_at')
-        .eq('user_id', user.id)
-        .in('conversation_id', conversationIds);
+      // Get all messages from these conversations not sent by user
+      const { data: messages } = await supabase
+        .from('messages')
+        .select('conversation_id, created_at')
+        .in('conversation_id', conversationIds)
+        .neq('sender_id', user.id);
 
-      const readMap = new Map(reads?.map(r => [r.conversation_id, r.last_read_at]) || []);
-
-      // Count unread messages
+      // Count unread messages client-side
       let total = 0;
-      for (const convId of conversationIds) {
-        const lastRead = readMap.get(convId);
-        
-        let query = supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('conversation_id', convId)
-          .neq('sender_id', user.id);
-        
-        if (lastRead) {
-          query = query.gt('created_at', lastRead);
+      (messages || []).forEach(msg => {
+        const lastRead = readMap.get(msg.conversation_id);
+        if (!lastRead || new Date(msg.created_at) > new Date(lastRead)) {
+          total++;
         }
-
-        const { count } = await query;
-        total += count || 0;
-      }
+      });
 
       setUnreadCount(total);
     };
