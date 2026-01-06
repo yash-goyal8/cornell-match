@@ -48,7 +48,7 @@ export interface Match {
   user_id: string;
   target_user_id: string;
   team_id?: string;
-  match_type: 'individual' | 'team_to_individual' | 'individual_to_team';
+  match_type: 'individual' | 'individual_to_individual' | 'team_to_individual' | 'individual_to_team';
   status: 'pending' | 'matched' | 'rejected' | 'accepted';
   created_at: string;
   updated_at: string;

@@ -82,8 +82,26 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
           }
         }
 
+        // Also fetch conversations from individual matches where user is participant
+        const { data: individualMatches } = await supabase
+          .from('matches')
+          .select('id')
+          .or(`user_id.eq.${currentUserId},target_user_id.eq.${currentUserId}`)
+          .in('match_type', ['individual_to_individual', 'team_to_individual', 'individual_to_team']);
+
+        let individualMatchConvIds: string[] = [];
+        if (individualMatches && individualMatches.length > 0) {
+          const matchIds = individualMatches.map(m => m.id);
+          const { data: matchConvs } = await supabase
+            .from('conversations')
+            .select('id')
+            .in('match_id', matchIds);
+          
+          individualMatchConvIds = (matchConvs || []).map(c => c.id);
+        }
+
         // Combine and dedupe conversation IDs
-        const allConvIds = [...new Set([...participantConvIds, ...teamMatchConvIds])];
+        const allConvIds = [...new Set([...participantConvIds, ...teamMatchConvIds, ...individualMatchConvIds])];
 
         if (allConvIds.length > 0) {
           const { data: convData } = await supabase
@@ -98,7 +116,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
               let team = undefined;
               let match = undefined;
 
-              // If this is a join request conversation, fetch match details
+              // If this conversation has a match, fetch match details
               if (conv.match_id) {
                 const { data: matchData } = await supabase
                   .from('matches')
@@ -107,51 +125,74 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
                   .single();
 
                 if (matchData) {
-                  // Get team info
-                  const { data: teamData } = await supabase
-                    .from('teams')
-                    .select('id, name')
-                    .eq('id', matchData.team_id)
-                    .single();
+                  // Handle individual_to_individual matches (no team involved)
+                  if (matchData.match_type === 'individual_to_individual') {
+                    // Determine who the "other" person is
+                    const otherUserId = matchData.user_id === currentUserId 
+                      ? matchData.target_user_id 
+                      : matchData.user_id;
 
-                  // Determine who the "other" person is based on match type
-                  const individualUserId = matchData.match_type === 'team_to_individual' 
-                    ? matchData.target_user_id 
-                    : matchData.user_id;
+                    const { data: otherProfile } = await supabase
+                      .from('profiles')
+                      .select('user_id, name, avatar, program')
+                      .eq('user_id', otherUserId)
+                      .single();
 
-                  const { data: individualProfile } = await supabase
-                    .from('profiles')
-                    .select('user_id, name, avatar, program')
-                    .eq('user_id', individualUserId)
-                    .single();
+                    if (otherProfile) {
+                      otherUser = {
+                        id: otherProfile.user_id,
+                        name: otherProfile.name,
+                        avatar: otherProfile.avatar || '',
+                      };
+                    }
+                  } else {
+                    // Team-based matches (team_to_individual or individual_to_team)
+                    // Get team info
+                    const { data: teamData } = await supabase
+                      .from('teams')
+                      .select('id, name')
+                      .eq('id', matchData.team_id)
+                      .single();
 
-                  match = {
-                    id: matchData.id,
-                    user_id: matchData.user_id,
-                    target_user_id: matchData.target_user_id,
-                    team_id: matchData.team_id,
-                    match_type: matchData.match_type as 'team_to_individual' | 'individual_to_team',
-                    status: matchData.status as 'pending' | 'matched' | 'rejected' | 'accepted',
-                    team: teamData ? { id: teamData.id, name: teamData.name } : undefined,
-                    individual_profile: individualProfile ? {
-                      id: individualProfile.user_id,
-                      name: individualProfile.name,
-                      avatar: individualProfile.avatar || '',
-                      program: individualProfile.program,
-                    } : undefined,
-                  };
+                    // Determine who the "other" person is based on match type
+                    const individualUserId = matchData.match_type === 'team_to_individual' 
+                      ? matchData.target_user_id 
+                      : matchData.user_id;
 
-                  // Set other_user based on the individual in the request
-                  if (individualProfile) {
-                    otherUser = {
-                      id: individualProfile.user_id,
-                      name: individualProfile.name,
-                      avatar: individualProfile.avatar || '',
+                    const { data: individualProfile } = await supabase
+                      .from('profiles')
+                      .select('user_id, name, avatar, program')
+                      .eq('user_id', individualUserId)
+                      .single();
+
+                    match = {
+                      id: matchData.id,
+                      user_id: matchData.user_id,
+                      target_user_id: matchData.target_user_id,
+                      team_id: matchData.team_id,
+                      match_type: matchData.match_type as 'team_to_individual' | 'individual_to_team',
+                      status: matchData.status as 'pending' | 'matched' | 'rejected' | 'accepted',
+                      team: teamData ? { id: teamData.id, name: teamData.name } : undefined,
+                      individual_profile: individualProfile ? {
+                        id: individualProfile.user_id,
+                        name: individualProfile.name,
+                        avatar: individualProfile.avatar || '',
+                        program: individualProfile.program,
+                      } : undefined,
                     };
-                  }
 
-                  if (teamData) {
-                    team = { id: teamData.id, name: teamData.name };
+                    // Set other_user based on the individual in the request
+                    if (individualProfile) {
+                      otherUser = {
+                        id: individualProfile.user_id,
+                        name: individualProfile.name,
+                        avatar: individualProfile.avatar || '',
+                      };
+                    }
+
+                    if (teamData) {
+                      team = { id: teamData.id, name: teamData.name };
+                    }
                   }
                 }
               } else if (conv.type === 'direct') {
@@ -207,13 +248,12 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
           setConversations([]);
         }
 
-        // Fetch individual matches (for the Matches tab)
+        // Fetch individual matches (for the Matches tab) - includes individual_to_individual
         const { data: matchData } = await supabase
           .from('matches')
           .select('*')
           .or(`user_id.eq.${currentUserId},target_user_id.eq.${currentUserId}`)
-          .eq('status', 'matched')
-          .eq('match_type', 'individual');
+          .in('match_type', ['individual', 'individual_to_individual']);
 
         const matchesWithProfiles: Match[] = await Promise.all(
           (matchData || []).map(async (match) => {
@@ -229,7 +269,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
 
             return {
               ...match,
-              match_type: match.match_type as 'individual' | 'team_to_individual' | 'individual_to_team',
+              match_type: match.match_type as 'individual' | 'individual_to_individual' | 'team_to_individual' | 'individual_to_team',
               status: match.status as 'pending' | 'matched' | 'rejected' | 'accepted',
               target_profile: profile ? {
                 id: profile.user_id,
@@ -331,10 +371,21 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
   };
 
   const handleStartChat = async (match: Match) => {
+    // Determine who the "other" user is - could be user_id or target_user_id depending on who swiped
+    const otherUserId = match.user_id === currentUserId ? match.target_user_id : match.user_id;
+    
+    // First check if a conversation already exists for this match
+    const existingConvByMatch = conversations.find(c => c.match_id === match.id);
+    if (existingConvByMatch) {
+      handleSelectConversation(existingConvByMatch);
+      return;
+    }
+
+    // Also check by other_user for backwards compatibility
     const existingConv = conversations.find(
       (c) =>
         c.type === 'direct' &&
-        c.other_user?.id === match.target_user_id
+        c.other_user?.id === otherUserId
     );
 
     if (existingConv) {
@@ -345,19 +396,24 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
     try {
       setIsLoading(true);
 
+      // Create conversation linked to the match
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
-        .insert({ type: 'direct' })
+        .insert({ 
+          type: 'direct',
+          match_id: match.id 
+        })
         .select()
         .single();
 
       if (convError) throw convError;
 
+      // Add both participants
       const { error: partError } = await supabase
         .from('conversation_participants')
         .insert([
           { conversation_id: conversation.id, user_id: currentUserId },
-          { conversation_id: conversation.id, user_id: match.target_user_id },
+          { conversation_id: conversation.id, user_id: otherUserId },
         ]);
 
       if (partError) throw partError;
@@ -366,10 +422,11 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
         id: conversation.id,
         type: conversation.type as 'direct' | 'team',
         team_id: conversation.team_id || undefined,
+        match_id: conversation.match_id || undefined,
         created_at: conversation.created_at,
         updated_at: conversation.updated_at,
         other_user: {
-          id: match.target_user_id,
+          id: otherUserId,
           name: match.target_profile?.name || 'Unknown',
           avatar: match.target_profile?.avatar || '',
         },

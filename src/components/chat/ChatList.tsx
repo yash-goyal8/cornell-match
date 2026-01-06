@@ -27,7 +27,8 @@ export const ChatList = ({
 }: ChatListProps) => {
   const [activeTab, setActiveTab] = useState<'chats' | 'matches'>('chats');
 
-  const pendingMatches = matches.filter(m => m.status === 'matched');
+  // Show pending matches that the user can start chatting with
+  const pendingMatches = matches.filter(m => m.status === 'pending' || m.status === 'matched');
 
   return (
     <div className="flex flex-col h-full bg-background">
