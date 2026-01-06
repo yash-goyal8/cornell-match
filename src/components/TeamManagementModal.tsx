@@ -9,7 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Team, UserProfile, Program, Studio } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Users, Crown, MoreVertical, UserPlus, Shield, UserMinus, Loader2, MessageSquare, Trash2, LogOut } from 'lucide-react';
+import { Users, Crown, MoreVertical, UserPlus, Shield, UserMinus, Loader2, MessageSquare, Trash2, LogOut, Check, X } from 'lucide-react';
 import { MemberProfileModal } from './MemberProfileModal';
 
 interface TeamMember extends UserProfile {
@@ -35,10 +35,15 @@ export const TeamManagementModal = ({
   onTeamDeleted
 }: TeamManagementModalProps) => {
   const [members, setMembers] = useState<TeamMember[]>([]);
-  const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<Array<{
+    matchId: string;
+    userId: string;
+    matchType: 'team_to_individual' | 'individual_to_team';
+    profile: UserProfile;
+  }>>([]);
   const [loading, setLoading] = useState(false);
-  const [showAddMembers, setShowAddMembers] = useState(false);
-  const [addingMember, setAddingMember] = useState<string | null>(null);
+  const [showRequests, setShowRequests] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -56,7 +61,7 @@ export const TeamManagementModal = ({
   useEffect(() => {
     if (isOpen && team) {
       fetchMembers();
-      fetchAvailableUsers();
+      fetchPendingRequests();
     }
   }, [isOpen, team]);
 
@@ -112,51 +117,85 @@ export const TeamManagementModal = ({
     }
   };
 
-  const fetchAvailableUsers = async () => {
+  /**
+   * Fetch pending join requests for this team
+   * - team_to_individual: Team swiped right on someone (pending their acceptance)
+   * - individual_to_team: Someone swiped right on team (pending team's acceptance)
+   */
+  const fetchPendingRequests = async () => {
     if (!team) return;
 
     try {
-      // Get current team member user_ids
-      const { data: currentMembers } = await supabase
-        .from('team_members')
-        .select('user_id')
+      // Fetch pending matches involving this team
+      const { data: matches, error: matchesError } = await supabase
+        .from('matches')
+        .select('id, user_id, target_user_id, match_type')
         .eq('team_id', team.id)
-        .eq('status', 'confirmed');
+        .eq('status', 'pending')
+        .in('match_type', ['team_to_individual', 'individual_to_team']);
 
-      const memberUserIds = new Set((currentMembers || []).map(m => m.user_id));
+      if (matchesError) throw matchesError;
 
-      // Get all profiles not in this team
-      const { data: profiles, error } = await supabase
+      if (!matches || matches.length === 0) {
+        setPendingRequests([]);
+        return;
+      }
+
+      // Get profile IDs - for team_to_individual it's target_user_id, for individual_to_team it's user_id
+      const userIds = matches.map(m => 
+        m.match_type === 'team_to_individual' ? m.target_user_id : m.user_id
+      );
+
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*');
+        .select('*')
+        .in('user_id', userIds);
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      const available: UserProfile[] = (profiles || [])
-        .filter(p => !memberUserIds.has(p.user_id))
-        .map(p => ({
-          id: p.user_id,
-          name: p.name,
-          program: p.program as Program,
-          skills: p.skills || [],
-          bio: p.bio || '',
-          studioPreference: p.studio_preference as Studio,
-          studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
-          avatar: p.avatar || '',
-          linkedIn: p.linkedin,
-        }));
+      const requests = matches.map(m => {
+        const profileUserId = m.match_type === 'team_to_individual' ? m.target_user_id : m.user_id;
+        const profile = profiles?.find(p => p.user_id === profileUserId);
+        return {
+          matchId: m.id,
+          userId: profileUserId,
+          matchType: m.match_type as 'team_to_individual' | 'individual_to_team',
+          profile: {
+            id: profile?.user_id || profileUserId,
+            name: profile?.name || 'Unknown',
+            program: (profile?.program || 'MBA') as Program,
+            skills: profile?.skills || [],
+            bio: profile?.bio || '',
+            studioPreference: (profile?.studio_preference || 'startup') as Studio,
+            studioPreferences: (profile?.studio_preferences as Studio[]) || [(profile?.studio_preference || 'startup') as Studio],
+            avatar: profile?.avatar || '',
+            linkedIn: profile?.linkedin,
+          },
+        };
+      });
 
-      setAvailableUsers(available);
+      setPendingRequests(requests);
     } catch (error) {
-      console.error('Error fetching available users:', error);
+      console.error('Error fetching pending requests:', error);
     }
   };
 
-  const handleAddMember = async (userId: string) => {
+  /**
+   * Accept a pending join request - adds user to team
+   */
+  const handleAcceptRequest = async (matchId: string, userId: string) => {
     if (!team) return;
     
-    setAddingMember(userId);
+    setProcessingRequest(matchId);
     try {
+      // Update match status to accepted
+      const { error: matchError } = await supabase
+        .from('matches')
+        .update({ status: 'accepted' })
+        .eq('id', matchId);
+
+      if (matchError) throw matchError;
+
       // Add to team_members
       const { error: memberError } = await supabase
         .from('team_members')
@@ -186,14 +225,37 @@ export const TeamManagementModal = ({
           });
       }
 
-      toast.success('Member added to team');
+      toast.success('Request accepted! Member added to team');
       await fetchMembers();
-      await fetchAvailableUsers();
+      await fetchPendingRequests();
     } catch (error) {
-      console.error('Error adding member:', error);
-      toast.error('Failed to add member');
+      console.error('Error accepting request:', error);
+      toast.error('Failed to accept request');
     } finally {
-      setAddingMember(null);
+      setProcessingRequest(null);
+    }
+  };
+
+  /**
+   * Reject a pending join request
+   */
+  const handleRejectRequest = async (matchId: string) => {
+    setProcessingRequest(matchId);
+    try {
+      const { error } = await supabase
+        .from('matches')
+        .update({ status: 'rejected' })
+        .eq('id', matchId);
+
+      if (error) throw error;
+
+      toast.success('Request rejected');
+      await fetchPendingRequests();
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Failed to reject request');
+    } finally {
+      setProcessingRequest(null);
     }
   };
 
@@ -261,7 +323,7 @@ export const TeamManagementModal = ({
 
       toast.success(`${memberName} removed from team`);
       await fetchMembers();
-      await fetchAvailableUsers();
+      await fetchPendingRequests();
     } catch (error) {
       console.error('Error removing member:', error);
       toast.error('Failed to remove member');
@@ -456,49 +518,64 @@ export const TeamManagementModal = ({
               <Button 
                 variant="outline" 
                 className="flex-1"
-                onClick={() => setShowAddMembers(!showAddMembers)}
+                onClick={() => setShowRequests(!showRequests)}
               >
                 <UserPlus className="w-4 h-4 mr-2" />
-                Add Members
+                Requests {pendingRequests.length > 0 && `(${pendingRequests.length})`}
               </Button>
             )}
           </div>
 
-          {/* Add members section */}
-          {showAddMembers && canManageMembers && (
+          {/* Pending Requests section */}
+          {showRequests && canManageMembers && (
             <div className="p-3 rounded-lg bg-accent/30 space-y-2">
-              <p className="text-sm font-medium">Available Users</p>
-              {availableUsers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No users available to add</p>
+              <p className="text-sm font-medium">Pending Requests</p>
+              {pendingRequests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No pending requests</p>
               ) : (
                 <ScrollArea className="h-40">
                   <div className="space-y-2">
-                    {availableUsers.map((user) => (
+                    {pendingRequests.map((request) => (
                       <div 
-                        key={user.id} 
+                        key={request.matchId} 
                         className="flex items-center justify-between p-2 rounded-lg bg-background"
                       >
                         <div className="flex items-center gap-2">
                           <Avatar className="w-8 h-8">
-                            <AvatarImage src={user.avatar} />
-                            <AvatarFallback>{user.name[0]}</AvatarFallback>
+                            <AvatarImage src={request.profile.avatar} />
+                            <AvatarFallback>{request.profile.name[0]}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="text-sm font-medium">{user.name}</p>
-                            <p className="text-xs text-muted-foreground">{user.program}</p>
+                            <p className="text-sm font-medium">{request.profile.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {request.profile.program} • {request.matchType === 'individual_to_team' ? 'Wants to join' : 'Invited'}
+                            </p>
                           </div>
                         </div>
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleAddMember(user.id)}
-                          disabled={addingMember === user.id}
-                        >
-                          {addingMember === user.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            'Add'
-                          )}
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button 
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-green-500 hover:text-green-600 hover:bg-green-500/10"
+                            onClick={() => handleAcceptRequest(request.matchId, request.userId)}
+                            disabled={processingRequest === request.matchId}
+                          >
+                            {processingRequest === request.matchId ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button 
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            onClick={() => handleRejectRequest(request.matchId)}
+                            disabled={processingRequest === request.matchId}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

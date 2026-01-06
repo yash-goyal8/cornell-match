@@ -27,6 +27,7 @@ export interface Conversation {
   team?: {
     id: string;
     name: string;
+    member_count?: number;
   };
   // For join request conversations
   match?: JoinRequestMatch;
