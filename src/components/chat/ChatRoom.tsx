@@ -99,7 +99,7 @@ export const ChatRoom = ({
           <h2 className="font-semibold text-foreground truncate">{chatName}</h2>
           {conversation.type === 'team' && (
             <p className="text-xs text-muted-foreground">
-              {conversation.participants?.length || 0} members
+              {conversation.team?.member_count || 0} member{(conversation.team?.member_count || 0) !== 1 ? 's' : ''}
             </p>
           )}
         </div>

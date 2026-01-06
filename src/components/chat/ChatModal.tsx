@@ -264,15 +264,26 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
                   }
                 }
               } else if (conv.type === 'team' && conv.team_id) {
-                // Team conversation
-                const { data: teamData } = await supabase
-                  .from('teams')
-                  .select('id, name')
-                  .eq('id', conv.team_id)
-                  .single();
+                // Team conversation - fetch team info and member count
+                const [teamResult, memberCountResult] = await Promise.all([
+                  supabase
+                    .from('teams')
+                    .select('id, name')
+                    .eq('id', conv.team_id)
+                    .single(),
+                  supabase
+                    .from('team_members')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('team_id', conv.team_id)
+                    .eq('status', 'confirmed')
+                ]);
 
-                if (teamData) {
-                  team = { id: teamData.id, name: teamData.name };
+                if (teamResult.data) {
+                  team = { 
+                    id: teamResult.data.id, 
+                    name: teamResult.data.name,
+                    member_count: memberCountResult.count || 0
+                  };
                 }
               }
 
