@@ -40,7 +40,125 @@ const Index = () => {
   const [history, setHistory] = useState<SwipeHistory[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+
+  // Load activity history from database on mount
+  useEffect(() => {
+    const loadActivityHistory = async () => {
+      if (!user) return;
+
+      setLoadingHistory(true);
+      try {
+        // Fetch all matches (swipes) made by the user
+        const { data: matchesData, error } = await supabase
+          .from("matches")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Error loading activity history:", error);
+          return;
+        }
+
+        if (!matchesData || matchesData.length === 0) {
+          setLoadingHistory(false);
+          return;
+        }
+
+        // Separate individual and team matches
+        const individualMatches = matchesData.filter(
+          (m) => m.match_type === "individual_to_individual" || m.match_type === "team_to_individual"
+        );
+        const teamMatches = matchesData.filter((m) => m.match_type === "individual_to_team");
+
+        // Fetch profiles for individual matches
+        const targetUserIds = individualMatches.map((m) => m.target_user_id);
+        let profilesMap: Record<string, any> = {};
+
+        if (targetUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("*")
+            .in("user_id", targetUserIds);
+
+          (profiles || []).forEach((p) => {
+            profilesMap[p.user_id] = p;
+          });
+        }
+
+        // Fetch teams for team matches
+        const teamIds = teamMatches.map((m) => m.team_id).filter(Boolean);
+        let teamsMap: Record<string, any> = {};
+
+        if (teamIds.length > 0) {
+          const { data: teamsData } = await supabase
+            .from("teams")
+            .select("*")
+            .in("id", teamIds);
+
+          (teamsData || []).forEach((t) => {
+            teamsMap[t.id] = t;
+          });
+        }
+
+        // Build history items
+        const historyItems: SwipeHistory[] = [];
+
+        individualMatches.forEach((match) => {
+          const profile = profilesMap[match.target_user_id];
+          if (profile) {
+            historyItems.push({
+              type: "user",
+              item: {
+                id: profile.user_id,
+                name: profile.name,
+                program: profile.program as Program,
+                skills: profile.skills || [],
+                bio: profile.bio || "",
+                studioPreference: profile.studio_preference as Studio,
+                studioPreferences: (profile.studio_preferences as Studio[]) || [profile.studio_preference as Studio],
+                avatar: profile.avatar || undefined,
+                linkedIn: profile.linkedin || undefined,
+              },
+              direction: match.status === "rejected" ? "left" : "right",
+            });
+          }
+        });
+
+        teamMatches.forEach((match) => {
+          const team = match.team_id ? teamsMap[match.team_id] : null;
+          if (team) {
+            historyItems.push({
+              type: "team",
+              item: {
+                id: team.id,
+                name: team.name,
+                description: team.description || "",
+                studio: team.studio as Studio,
+                members: [],
+                lookingFor: [],
+                skillsNeeded: [],
+                createdBy: team.created_by,
+              },
+              direction: match.status === "rejected" ? "left" : "right",
+            });
+          }
+        });
+
+        setHistory(historyItems);
+      } catch (error) {
+        console.error("Error loading activity history:", error);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    if (profile) {
+      loadActivityHistory();
+    }
+  }, [user, profile]);
 
   // Filter state
   const [peopleFilters, setPeopleFilters] = useState<PeopleFilters>({
