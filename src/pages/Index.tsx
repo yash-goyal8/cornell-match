@@ -37,11 +37,83 @@ const Index = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<string[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [history, setHistory] = useState<SwipeHistory[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+
+  // Fetch unread message count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!user) return;
+
+      // Get all conversations the user is part of
+      const { data: participations } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (!participations || participations.length === 0) {
+        setUnreadCount(0);
+        return;
+      }
+
+      const conversationIds = participations.map(p => p.conversation_id);
+
+      // Get last read times for each conversation
+      const { data: reads } = await supabase
+        .from('message_reads')
+        .select('conversation_id, last_read_at')
+        .eq('user_id', user.id)
+        .in('conversation_id', conversationIds);
+
+      const readMap = new Map(reads?.map(r => [r.conversation_id, r.last_read_at]) || []);
+
+      // Count unread messages
+      let total = 0;
+      for (const convId of conversationIds) {
+        const lastRead = readMap.get(convId);
+        
+        let query = supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', convId)
+          .neq('sender_id', user.id);
+        
+        if (lastRead) {
+          query = query.gt('created_at', lastRead);
+        }
+
+        const { count } = await query;
+        total += count || 0;
+      }
+
+      setUnreadCount(total);
+    };
+
+    fetchUnreadCount();
+
+    // Subscribe to new messages for real-time updates
+    const channel = supabase
+      .channel('header-unread')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        () => fetchUnreadCount()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_reads' },
+        () => fetchUnreadCount()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   // Load activity history from database on mount
   useEffect(() => {
@@ -919,6 +991,7 @@ const Index = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         matchCount={matches.length}
+        unreadCount={unreadCount}
         onProfileClick={() => setIsMyProfileOpen(true)}
         onChatClick={() => setIsChatOpen(true)}
         userAvatar={profile?.avatar}
