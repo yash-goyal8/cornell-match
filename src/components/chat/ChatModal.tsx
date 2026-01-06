@@ -24,6 +24,8 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
   const [isLoading, setIsLoading] = useState(false);
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
   const [joinRequestMatch, setJoinRequestMatch] = useState<JoinRequestMatch | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState<'chats' | 'matches'>('chats');
 
   // Check which teams the user is a member of
   const fetchUserTeams = useCallback(async () => {
@@ -34,6 +36,47 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
       .eq('status', 'confirmed');
     
     setUserTeamIds((memberships || []).map(m => m.team_id));
+  }, [currentUserId]);
+
+  // Fetch unread message counts for conversations
+  const fetchUnreadCounts = useCallback(async (conversationIds: string[]) => {
+    if (conversationIds.length === 0) {
+      setUnreadCounts({});
+      return;
+    }
+
+    const counts: Record<string, number> = {};
+
+    // Get user's last read timestamps for each conversation
+    const { data: reads } = await supabase
+      .from('message_reads')
+      .select('conversation_id, last_read_at')
+      .eq('user_id', currentUserId)
+      .in('conversation_id', conversationIds);
+
+    const readMap = new Map((reads || []).map(r => [r.conversation_id, r.last_read_at]));
+
+    // For each conversation, count messages after last_read_at
+    await Promise.all(
+      conversationIds.map(async (convId) => {
+        const lastReadAt = readMap.get(convId);
+        
+        let query = supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', convId)
+          .neq('sender_id', currentUserId);
+
+        if (lastReadAt) {
+          query = query.gt('created_at', lastReadAt);
+        }
+
+        const { count } = await query;
+        counts[convId] = count || 0;
+      })
+    );
+
+    setUnreadCounts(counts);
   }, [currentUserId]);
 
   // Fetch conversations and matches when modal opens
@@ -244,8 +287,12 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
           );
 
           setConversations(conversationsWithDetails);
+          
+          // Fetch unread counts for each conversation
+          await fetchUnreadCounts(conversationsWithDetails.map(c => c.id));
         } else {
           setConversations([]);
+          setUnreadCounts({});
         }
 
         // Fetch individual matches (for the Matches tab) - includes individual_to_individual
@@ -363,11 +410,41 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
     }
   };
 
-  const handleSelectConversation = (conversation: Conversation) => {
+  const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
     setJoinRequestMatch(conversation.match || null);
     fetchMessages(conversation.id);
     setView('room');
+    
+    // Mark messages as read by updating/inserting last_read_at
+    try {
+      const { data: existingRead } = await supabase
+        .from('message_reads')
+        .select('id')
+        .eq('conversation_id', conversation.id)
+        .eq('user_id', currentUserId)
+        .maybeSingle();
+
+      if (existingRead) {
+        await supabase
+          .from('message_reads')
+          .update({ last_read_at: new Date().toISOString() })
+          .eq('id', existingRead.id);
+      } else {
+        await supabase
+          .from('message_reads')
+          .insert({
+            conversation_id: conversation.id,
+            user_id: currentUserId,
+            last_read_at: new Date().toISOString(),
+          });
+      }
+
+      // Update unread count for this conversation
+      setUnreadCounts(prev => ({ ...prev, [conversation.id]: 0 }));
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
   };
 
   const handleStartChat = async (match: Match) => {
@@ -622,6 +699,9 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
             onStartChat={handleStartChat}
             onBack={onClose}
             selectedId={selectedConversation?.id}
+            unreadCounts={unreadCounts}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
           />
         ) : selectedConversation ? (
           <ChatRoom
