@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Users, ChevronLeft, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,6 +14,9 @@ interface ChatListProps {
   onStartChat: (match: Match) => void;
   onBack: () => void;
   selectedId?: string;
+  unreadCounts: Record<string, number>;
+  activeTab: 'chats' | 'matches';
+  onTabChange: (tab: 'chats' | 'matches') => void;
 }
 
 export const ChatList = ({
@@ -24,11 +26,15 @@ export const ChatList = ({
   onStartChat,
   onBack,
   selectedId,
+  unreadCounts,
+  activeTab,
+  onTabChange,
 }: ChatListProps) => {
-  const [activeTab, setActiveTab] = useState<'chats' | 'matches'>('chats');
-
   // Show pending matches that the user can start chatting with
   const pendingMatches = matches.filter(m => m.status === 'pending' || m.status === 'matched');
+  
+  // Calculate total unread count for chats tab badge
+  const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -43,9 +49,9 @@ export const ChatList = ({
       {/* Tabs */}
       <div className="flex border-b border-border">
         <button
-          onClick={() => setActiveTab('chats')}
+          onClick={() => onTabChange('chats')}
           className={cn(
-            "flex-1 py-3 text-sm font-medium transition-colors",
+            "flex-1 py-3 text-sm font-medium transition-colors relative",
             activeTab === 'chats'
               ? "text-primary border-b-2 border-primary"
               : "text-muted-foreground hover:text-foreground"
@@ -53,9 +59,14 @@ export const ChatList = ({
         >
           <MessageCircle className="w-4 h-4 inline mr-2" />
           Chats
+          {totalUnread > 0 && (
+            <span className="absolute top-2 right-4 w-5 h-5 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center">
+              {totalUnread > 99 ? '99+' : totalUnread}
+            </span>
+          )}
         </button>
         <button
-          onClick={() => setActiveTab('matches')}
+          onClick={() => onTabChange('matches')}
           className={cn(
             "flex-1 py-3 text-sm font-medium transition-colors relative",
             activeTab === 'matches'
@@ -144,21 +155,22 @@ export const ChatList = ({
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {isJoinRequest && conversation.match?.team
-                          ? `${conversation.match.match_type === 'team_to_individual' ? 'Invited by' : 'Wants to join'} ${conversation.match.team.name}`
-                          : conversation.last_message?.content || 'No messages yet'
-                        }
-                      </p>
                     </div>
-                    {conversation.last_message && (
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(conversation.last_message.created_at).toLocaleTimeString([], { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })}
-                      </span>
-                    )}
+                    <div className="flex flex-col items-end gap-1">
+                      {conversation.last_message && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(conversation.last_message.created_at).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </span>
+                      )}
+                      {unreadCounts[conversation.id] > 0 && (
+                        <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full text-xs flex items-center justify-center">
+                          {unreadCounts[conversation.id] > 99 ? '99+' : unreadCounts[conversation.id]}
+                        </span>
+                      )}
+                    </div>
                   </motion.button>
                 );
               })
