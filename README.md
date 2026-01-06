@@ -1,73 +1,95 @@
-# Welcome to your Lovable project
+# Spring Studio Team Matching
 
-## Project info
+A modern team matching application for MBA and graduate students to find teammates for studio projects. Built with React, TypeScript, and Supabase.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Swipe-based Matching**: Tinder-style card swiping to discover potential teammates
+- **Team Management**: Create teams, manage members, and handle join requests
+- **Real-time Chat**: Instant messaging with matched individuals and team conversations
+- **Smart Filtering**: Filter profiles by skills, programs, and studio preferences
+- **Activity History**: Track your swipe history with undo functionality
+- **Unread Notifications**: Real-time badge indicators for new messages
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18, TypeScript, Vite
+- **Styling**: Tailwind CSS, shadcn/ui components
+- **Animation**: Framer Motion
+- **Backend**: Supabase (PostgreSQL, Auth, Realtime)
+- **State Management**: React hooks + Context API
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Project Structure
 
-Changes made via Lovable will be committed automatically to this repo.
+```
+src/
+├── components/          # Reusable UI components
+│   ├── chat/           # Chat-related components
+│   ├── onboarding/     # User onboarding wizard
+│   └── ui/             # shadcn/ui base components
+├── contexts/           # React Context providers
+│   └── AuthContext.tsx # Authentication state management
+├── hooks/              # Custom React hooks
+│   ├── useProfiles.ts      # Profile data fetching
+│   ├── useTeams.ts         # Team data fetching
+│   ├── useUnreadCount.ts   # Unread message counter
+│   ├── useMyTeam.ts        # User's team management
+│   ├── useActivityHistory.ts # Swipe history tracking
+│   ├── useSwipeActions.ts  # Swipe action handlers
+│   └── useTeamMatching.ts  # Match creation logic
+├── pages/              # Route pages
+│   ├── Index.tsx       # Main matching interface
+│   ├── Auth.tsx        # Authentication page
+│   └── NotFound.tsx    # 404 page
+├── types/              # TypeScript type definitions
+├── lib/                # Utility functions
+└── integrations/       # External service integrations
+```
 
-**Use your preferred IDE**
+## Custom Hooks
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+| Hook | Purpose |
+|------|---------|
+| `useProfiles` | Fetches available user profiles, excludes swiped/team members |
+| `useTeams` | Fetches available teams with member data |
+| `useUnreadCount` | Optimized unread message counter with real-time updates |
+| `useMyTeam` | Manages current user's team membership |
+| `useActivityHistory` | Tracks and loads swipe history |
+| `useSwipeActions` | Handles swipe, undo, and match creation |
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Database Schema
 
-Follow these steps:
+- **profiles**: User profile information
+- **teams**: Team metadata and settings
+- **team_members**: Team membership with roles/status
+- **matches**: Swipe records (likes/passes)
+- **conversations**: Chat conversation metadata
+- **messages**: Chat messages
+- **message_reads**: Read receipt tracking
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Getting Started
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```bash
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The following are automatically configured:
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - Supabase anon key
 
-**Use GitHub Codespaces**
+## Development
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Code is organized by feature with custom hooks for data logic
+- All database queries use optimized parallel fetching
+- Real-time subscriptions for live updates
+- Proper TypeScript typing throughout
 
-## What technologies are used for this project?
+## License
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Private - All rights reserved
