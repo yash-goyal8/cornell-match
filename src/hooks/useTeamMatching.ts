@@ -106,17 +106,26 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
 
       if (convError) throw convError;
 
-      // Add the target individual to the conversation
-      const { error: partError } = await supabase
+      // Add BOTH parties to the conversation so both can see it
+      // Add the target individual
+      const { error: partError1 } = await supabase
         .from('conversation_participants')
         .insert({
           conversation_id: conversation.id,
           user_id: targetProfile.id,
         });
 
-      if (partError) throw partError;
+      if (partError1) throw partError1;
 
-      // Note: Team members can access via RLS policy without being explicit participants
+      // Add the team initiator (current user)
+      const { error: partError2 } = await supabase
+        .from('conversation_participants')
+        .insert({
+          conversation_id: conversation.id,
+          user_id: currentUserId,
+        });
+
+      if (partError2) throw partError2;
 
       toast.success(`Request sent to ${targetProfile.name}!`, {
         description: "They'll be able to chat with your team and decide.",
@@ -161,15 +170,26 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
 
       if (convError) throw convError;
 
-      // Add the individual to the conversation
-      const { error: partError } = await supabase
+      // Add BOTH parties to the conversation so both can see it
+      // Add the individual (current user)
+      const { error: partError1 } = await supabase
         .from('conversation_participants')
         .insert({
           conversation_id: conversation.id,
           user_id: currentUserId,
         });
 
-      if (partError) throw partError;
+      if (partError1) throw partError1;
+
+      // Add the team owner as a participant
+      const { error: partError2 } = await supabase
+        .from('conversation_participants')
+        .insert({
+          conversation_id: conversation.id,
+          user_id: targetTeam.createdBy,
+        });
+
+      if (partError2) throw partError2;
 
       toast.success(`Request sent to ${targetTeam.name}!`, {
         description: "The team will review your profile and can chat with you.",
