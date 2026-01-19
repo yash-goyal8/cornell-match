@@ -1,3 +1,10 @@
+/**
+ * useTeamMatching Hook
+ * 
+ * Handles all matching scenarios between users and teams.
+ * Uses optimized database functions for atomic operations.
+ */
+
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -10,68 +17,118 @@ interface UseTeamMatchingProps {
 }
 
 export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTeamMatchingProps) => {
-  // Individual swipes right on another individual - creates match and conversation
+  /**
+   * Creates a match using the optimized RPC function
+   * Falls back to sequential operations if RPC fails
+   */
+  const createMatchWithConversation = useCallback(async (
+    targetUserId: string,
+    matchType: string,
+    teamId: string | null = null,
+    conversationType: string = 'match'
+  ) => {
+    try {
+      // Try optimized RPC first
+      const { data, error } = await supabase.rpc('create_match_with_conversation', {
+        p_user_id: currentUserId,
+        p_target_user_id: targetUserId,
+        p_match_type: matchType,
+        p_team_id: teamId,
+        p_conversation_type: conversationType,
+      });
+
+      if (error) {
+        console.warn('RPC failed, using fallback:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in createMatchWithConversation:', error);
+      return null;
+    }
+  }, [currentUserId]);
+
+  /**
+   * Fallback for creating match with conversation (sequential operations)
+   */
+  const createMatchFallback = useCallback(async (
+    targetUserId: string,
+    matchType: string,
+    teamId: string | null = null,
+    conversationType: string = 'direct'
+  ) => {
+    // Create match record
+    const { data: match, error: matchError } = await supabase
+      .from('matches')
+      .insert({
+        user_id: currentUserId,
+        target_user_id: targetUserId,
+        match_type: matchType,
+        team_id: teamId,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (matchError) throw matchError;
+
+    // Create conversation
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .insert({
+        type: conversationType,
+        match_id: match.id,
+        team_id: teamId,
+      })
+      .select()
+      .single();
+
+    if (convError) throw convError;
+
+    // Add participants in parallel
+    await Promise.all([
+      supabase.from('conversation_participants').insert({
+        conversation_id: conversation.id,
+        user_id: currentUserId,
+      }),
+      supabase.from('conversation_participants').insert({
+        conversation_id: conversation.id,
+        user_id: targetUserId,
+      }),
+    ]);
+
+    return { match_id: match.id, conversation_id: conversation.id };
+  }, [currentUserId]);
+
+  // Individual swipes right on another individual
   const createIndividualToIndividualMatch = useCallback(async (targetProfile: UserProfile) => {
     try {
-      // Create match record
-      const { data: match, error: matchError } = await supabase
-        .from('matches')
-        .insert({
-          user_id: currentUserId,
-          target_user_id: targetProfile.id,
-          match_type: 'individual_to_individual',
-          status: 'pending',
-        })
-        .select()
-        .single();
+      let result = await createMatchWithConversation(
+        targetProfile.id,
+        'individual_to_individual',
+        null,
+        'match'
+      );
 
-      if (matchError) throw matchError;
-
-      // Create a conversation for them to chat
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          type: 'direct',
-          match_id: match.id,
-        })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      // Add both users to the conversation
-      const { error: partError1 } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversation.id,
-          user_id: currentUserId,
-        });
-
-      if (partError1) throw partError1;
-
-      const { error: partError2 } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversation.id,
-          user_id: targetProfile.id,
-        });
-
-      if (partError2) throw partError2;
+      if (!result) {
+        result = await createMatchFallback(targetProfile.id, 'individual_to_individual');
+      }
 
       toast.success(`Interest sent to ${targetProfile.name}!`, {
         description: "You can now chat with them in Messages.",
       });
 
       onMatchCreated?.();
-      return { match, conversation };
+      return result;
     } catch (error) {
       console.error('Error creating individual match:', error);
       toast.error('Failed to send interest');
       return null;
     }
-  }, [currentUserId, onMatchCreated]);
+  }, [createMatchWithConversation, createMatchFallback, onMatchCreated]);
 
-  // Team swipes right on an individual - creates a join request
+  // Team swipes right on an individual
   const createTeamToIndividualMatch = useCallback(async (targetProfile: UserProfile) => {
     if (!myTeam) {
       toast.error("You need to be part of a team to swipe on individuals");
@@ -79,160 +136,81 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
     }
 
     try {
-      // Create match record
-      const { data: match, error: matchError } = await supabase
-        .from('matches')
-        .insert({
-          user_id: currentUserId, // Who initiated the swipe
-          target_user_id: targetProfile.id,
-          team_id: myTeam.id,
-          match_type: 'team_to_individual',
-          status: 'pending',
-        })
-        .select()
-        .single();
+      let result = await createMatchWithConversation(
+        targetProfile.id,
+        'team_to_individual',
+        myTeam.id,
+        'match'
+      );
 
-      if (matchError) throw matchError;
-
-      // Create a conversation for negotiation
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          type: 'direct',
-          match_id: match.id,
-        })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      // Add BOTH parties to the conversation so both can see it
-      // Add the target individual
-      const { error: partError1 } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversation.id,
-          user_id: targetProfile.id,
-        });
-
-      if (partError1) throw partError1;
-
-      // Add the team initiator (current user)
-      const { error: partError2 } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversation.id,
-          user_id: currentUserId,
-        });
-
-      if (partError2) throw partError2;
+      if (!result) {
+        result = await createMatchFallback(targetProfile.id, 'team_to_individual', myTeam.id);
+      }
 
       toast.success(`Request sent to ${targetProfile.name}!`, {
         description: "They'll be able to chat with your team and decide.",
       });
 
       onMatchCreated?.();
-      return { match, conversation };
+      return result;
     } catch (error) {
       console.error('Error creating team match:', error);
       toast.error('Failed to send request');
       return null;
     }
-  }, [currentUserId, myTeam, onMatchCreated]);
+  }, [myTeam, createMatchWithConversation, createMatchFallback, onMatchCreated]);
 
-  // Individual swipes right on a team - creates a join request
+  // Individual swipes right on a team
   const createIndividualToTeamMatch = useCallback(async (targetTeam: Team) => {
     try {
-      // Create match record
-      const { data: match, error: matchError } = await supabase
-        .from('matches')
-        .insert({
-          user_id: currentUserId,
-          target_user_id: targetTeam.createdBy, // Team owner as primary contact
-          team_id: targetTeam.id,
-          match_type: 'individual_to_team',
-          status: 'pending',
-        })
-        .select()
-        .single();
+      let result = await createMatchWithConversation(
+        targetTeam.createdBy,
+        'individual_to_team',
+        targetTeam.id,
+        'match'
+      );
 
-      if (matchError) throw matchError;
-
-      // Create a conversation for negotiation
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          type: 'direct',
-          match_id: match.id,
-        })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      // Add BOTH parties to the conversation so both can see it
-      // Add the individual (current user)
-      const { error: partError1 } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversation.id,
-          user_id: currentUserId,
-        });
-
-      if (partError1) throw partError1;
-
-      // Add the team owner as a participant
-      const { error: partError2 } = await supabase
-        .from('conversation_participants')
-        .insert({
-          conversation_id: conversation.id,
-          user_id: targetTeam.createdBy,
-        });
-
-      if (partError2) throw partError2;
+      if (!result) {
+        result = await createMatchFallback(targetTeam.createdBy, 'individual_to_team', targetTeam.id);
+      }
 
       toast.success(`Request sent to ${targetTeam.name}!`, {
         description: "The team will review your profile and can chat with you.",
       });
 
       onMatchCreated?.();
-      return { match, conversation };
+      return result;
     } catch (error) {
       console.error('Error creating team match:', error);
       toast.error('Failed to send request');
       return null;
     }
-  }, [currentUserId, onMatchCreated]);
+  }, [createMatchWithConversation, createMatchFallback, onMatchCreated]);
 
   // Accept a join request - adds user to team
   const acceptJoinRequest = useCallback(async (matchId: string, teamId: string, userId: string) => {
     try {
-      // Check if user is already a team member (prevent duplicates)
-      const { data: existingMember } = await supabase
-        .from('team_members')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('user_id', userId)
-        .eq('status', 'confirmed')
-        .maybeSingle();
-
-      if (existingMember) {
-        toast.error('This user is already a team member');
-        // Still update the match status
-        await supabase
+      // Update match status and add member in parallel where possible
+      const [matchUpdate, existingMember] = await Promise.all([
+        supabase
           .from('matches')
           .update({ status: 'accepted' })
-          .eq('id', matchId);
+          .eq('id', matchId),
+        supabase
+          .from('team_members')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('user_id', userId)
+          .eq('status', 'confirmed')
+          .maybeSingle(),
+      ]);
+
+      if (matchUpdate.error) throw matchUpdate.error;
+
+      if (existingMember.data) {
+        toast.info('This user is already a team member');
         return true;
       }
-
-      // Update match status
-      const { error: matchError } = await supabase
-        .from('matches')
-        .update({ status: 'accepted' })
-        .eq('id', matchId);
-
-      if (matchError) throw matchError;
 
       // Add user to team
       const { error: memberError } = await supabase
@@ -246,7 +224,7 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
 
       if (memberError) throw memberError;
 
-      // Add user to team conversation (with duplicate check)
+      // Add user to team conversation
       const { data: teamConv } = await supabase
         .from('conversations')
         .select('id')
@@ -255,7 +233,6 @@ export const useTeamMatching = ({ currentUserId, myTeam, onMatchCreated }: UseTe
         .maybeSingle();
 
       if (teamConv) {
-        // Check if already a participant
         const { data: existingParticipant } = await supabase
           .from('conversation_participants')
           .select('id')

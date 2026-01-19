@@ -2,14 +2,14 @@
  * useTeams Hook
  * 
  * Fetches and manages teams for the matching system.
- * Handles team data transformation and member profile loading.
+ * Optimized with parallel queries and efficient data transformation.
  * 
  * @param userId - Current authenticated user's ID
  * @param hasProfile - Whether the current user has completed their profile
  * @returns {Object} teams state and management functions
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Team, UserProfile, Program, Studio } from '@/types';
 import { toast } from 'sonner';
@@ -30,17 +30,36 @@ interface UseTeamsResult {
 export function useTeams(userId: string | undefined, hasProfile: boolean): UseTeamsResult {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
+  const fetchingRef = useRef(false);
+
+  /**
+   * Transforms profile data to UserProfile format
+   */
+  const transformProfile = useCallback((p: any): UserProfile => ({
+    id: p.id || p.user_id,
+    name: p.name,
+    program: p.program as Program,
+    skills: p.skills || [],
+    bio: p.bio || '',
+    studioPreference: p.studio_preference as Studio,
+    studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
+    avatar: p.avatar || undefined,
+    linkedIn: p.linkedin || undefined,
+  }), []);
 
   /**
    * Fetches teams from the database with their members
-   * Excludes teams the user has already swiped on or is a member of
+   * Uses parallel queries for optimal performance
    */
   const fetchTeams = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || fetchingRef.current) return;
 
+    fetchingRef.current = true;
     setLoading(true);
+    
     try {
-      // Parallel fetch: swiped teams, all teams, and team members
+      // Parallel fetch: all data in one go
       const [swipedRes, teamsRes, membersRes] = await Promise.all([
         supabase
           .from('matches')
@@ -52,7 +71,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
         supabase
           .from('team_members')
           .select('team_id, user_id, role')
-          .eq('status', 'confirmed')
+          .eq('status', 'confirmed'),
       ]);
 
       if (teamsRes.error) {
@@ -74,13 +93,17 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
       );
 
       if (availableTeams.length === 0) {
-        setTeams([]);
+        if (isMountedRef.current) {
+          setTeams([]);
+          setLoading(false);
+        }
         return;
       }
 
-      // Fetch member profiles
+      // Get unique member user IDs for profile fetch
       const memberUserIds = [...new Set((membersRes.data || []).map(m => m.user_id))];
       
+      // Fetch member profiles if needed
       let profilesMap: Record<string, any> = {};
       if (memberUserIds.length > 0) {
         const { data: profilesData } = await supabase
@@ -93,25 +116,14 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
         });
       }
 
-      // Group members by team
-      const membersByTeam: Record<string, UserProfile[]> = {};
+      // Group members by team efficiently
+      const membersByTeam = new Map<string, UserProfile[]>();
       (membersRes.data || []).forEach(member => {
-        if (!membersByTeam[member.team_id]) {
-          membersByTeam[member.team_id] = [];
-        }
         const profile = profilesMap[member.user_id];
         if (profile) {
-          membersByTeam[member.team_id].push({
-            id: profile.id,
-            name: profile.name,
-            program: profile.program as Program,
-            skills: profile.skills || [],
-            bio: profile.bio || '',
-            studioPreference: profile.studio_preference as Studio,
-            studioPreferences: (profile.studio_preferences as Studio[]) || [profile.studio_preference as Studio],
-            avatar: profile.avatar || undefined,
-            linkedIn: profile.linkedin || undefined,
-          });
+          const teamMembers = membersByTeam.get(member.team_id) || [];
+          teamMembers.push(transformProfile(profile));
+          membersByTeam.set(member.team_id, teamMembers);
         }
       });
 
@@ -121,25 +133,38 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
         name: t.name,
         description: t.description || '',
         studio: t.studio as Studio,
-        members: membersByTeam[t.id] || [],
+        members: membersByTeam.get(t.id) || [],
         lookingFor: [],
-        skillsNeeded: [],
+        skillsNeeded: t.skills_needed || [],
         createdBy: t.created_by,
       }));
 
-      setTeams(transformedTeams);
+      if (isMountedRef.current) {
+        setTeams(transformedTeams);
+      }
     } catch (error) {
       console.error('Error fetching teams:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      fetchingRef.current = false;
     }
-  }, [userId]);
+  }, [userId, transformProfile]);
 
-  // Initial fetch when user has a profile
+  // Initial fetch and cleanup
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (hasProfile) {
       fetchTeams();
+    } else {
+      setLoading(false);
     }
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [hasProfile, fetchTeams]);
 
   const removeTeam = useCallback((teamId: string) => {

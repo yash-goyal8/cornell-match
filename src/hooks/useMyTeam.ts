@@ -2,14 +2,14 @@
  * useMyTeam Hook
  * 
  * Manages the current user's team membership and team data.
- * Handles team creation, updates, and deletion.
+ * Uses optimized database functions for atomic operations.
  * 
  * @param userId - Current authenticated user's ID
  * @param profile - Current user's profile data
  * @returns {Object} Team state and management functions
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Team, UserProfile, Program, Studio } from '@/types';
 import { toast } from 'sonner';
@@ -18,6 +18,8 @@ import { validateInput, teamSchema } from '@/lib/validation';
 interface UseMyTeamResult {
   /** The user's current team (null if not in a team) */
   myTeam: Team | null;
+  /** Whether the team is loading */
+  loading: boolean;
   /** Set the team directly */
   setMyTeam: React.Dispatch<React.SetStateAction<Team | null>>;
   /** Create a new team */
@@ -39,6 +41,9 @@ export function useMyTeam(
   profile: any
 ): UseMyTeamResult {
   const [myTeam, setMyTeam] = useState<Team | null>(null);
+  const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
+  const fetchingRef = useRef(false);
 
   /**
    * Transforms member profiles from database format to UserProfile
@@ -58,69 +63,98 @@ export function useMyTeam(
   }, []);
 
   /**
-   * Fetches and sets the user's team data
+   * Fetches and sets the user's team data using parallel queries
    */
   const refreshTeam = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || fetchingRef.current) return;
+    
+    fetchingRef.current = true;
+    setLoading(true);
 
-    // Check if user is a member of any team
-    const { data: membership } = await supabase
-      .from('team_members')
-      .select('team_id')
-      .eq('user_id', userId)
-      .eq('status', 'confirmed')
-      .maybeSingle();
+    try {
+      // Check if user is a member of any team
+      const { data: membership, error: membershipError } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId)
+        .eq('status', 'confirmed')
+        .maybeSingle();
 
-    if (!membership) {
-      setMyTeam(null);
-      return;
+      if (membershipError) throw membershipError;
+
+      if (!membership) {
+        if (isMountedRef.current) {
+          setMyTeam(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Parallel fetch: team details and team members
+      const [teamRes, membersRes] = await Promise.all([
+        supabase
+          .from('teams')
+          .select('*')
+          .eq('id', membership.team_id)
+          .single(),
+        supabase
+          .from('team_members')
+          .select('user_id')
+          .eq('team_id', membership.team_id)
+          .eq('status', 'confirmed'),
+      ]);
+
+      if (teamRes.error) throw teamRes.error;
+      const teamData = teamRes.data;
+
+      if (!teamData) {
+        if (isMountedRef.current) {
+          setMyTeam(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Fetch member profiles
+      const memberUserIds = (membersRes.data || []).map(m => m.user_id);
+      let teamMembers: UserProfile[] = [];
+
+      if (memberUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('user_id', memberUserIds);
+
+        teamMembers = transformMemberProfiles(profiles || []);
+      }
+
+      if (isMountedRef.current) {
+        setMyTeam({
+          id: teamData.id,
+          name: teamData.name,
+          description: teamData.description || '',
+          studio: teamData.studio as Studio,
+          members: teamMembers,
+          lookingFor: [],
+          skillsNeeded: teamData.skills_needed || [],
+          createdBy: teamData.created_by,
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing team:', error);
+      if (isMountedRef.current) {
+        setMyTeam(null);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      fetchingRef.current = false;
     }
-
-    // Fetch team details
-    const { data: teamData } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('id', membership.team_id)
-      .single();
-
-    if (!teamData) {
-      setMyTeam(null);
-      return;
-    }
-
-    // Fetch team members
-    const { data: members } = await supabase
-      .from('team_members')
-      .select('user_id')
-      .eq('team_id', teamData.id)
-      .eq('status', 'confirmed');
-
-    const memberUserIds = (members || []).map(m => m.user_id);
-    let teamMembers: UserProfile[] = [];
-
-    if (memberUserIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('user_id', memberUserIds);
-
-      teamMembers = transformMemberProfiles(profiles || []);
-    }
-
-    setMyTeam({
-      id: teamData.id,
-      name: teamData.name,
-      description: teamData.description || '',
-      studio: teamData.studio as Studio,
-      members: teamMembers,
-      lookingFor: [],
-      skillsNeeded: [],
-      createdBy: teamData.created_by,
-    });
   }, [userId, transformMemberProfiles]);
 
   /**
-   * Creates a new team with the current user as owner
+   * Creates a new team using the optimized database function
    */
   const createTeam = useCallback(async (teamData: CreateTeamData) => {
     if (!userId || !profile) return;
@@ -134,53 +168,27 @@ export function useMyTeam(
     const validatedData = (validation as { success: true; data: typeof teamData }).data;
 
     try {
-      // 1. Create the team
-      const { data: newTeam, error: teamError } = await supabase
-        .from('teams')
-        .insert({
-          name: validatedData.name,
-          description: validatedData.description,
-          studio: validatedData.studio,
-          looking_for: validatedData.lookingFor,
-          skills_needed: validatedData.skillsNeeded,
-          created_by: userId,
-        })
-        .select()
-        .single();
-
-      if (teamError) throw teamError;
-
-      // 2. Add creator as owner member
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert({
-          team_id: newTeam.id,
-          user_id: userId,
-          role: 'owner',
-          status: 'confirmed',
-        });
-
-      if (memberError) throw memberError;
-
-      // 3. Create team conversation
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          type: 'team',
-          team_id: newTeam.id,
-        })
-        .select()
-        .single();
-
-      if (convError) throw convError;
-
-      // 4. Add creator to conversation participants
-      await supabase.from('conversation_participants').insert({
-        conversation_id: conversation.id,
-        user_id: userId,
+      // Try to use the optimized RPC function first
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('create_team_with_owner', {
+        p_name: validatedData.name,
+        p_description: validatedData.description,
+        p_studio: validatedData.studio,
+        p_looking_for: validatedData.lookingFor,
+        p_skills_needed: validatedData.skillsNeeded,
+        p_user_id: userId,
       });
 
-      // Update local state
+      if (rpcError) {
+        // Fallback to sequential operations if RPC fails
+        console.warn('RPC failed, using fallback:', rpcError);
+        await createTeamFallback(validatedData);
+        return;
+      }
+
+      // Parse the RPC result
+      const resultData = rpcResult as { team_id: string; conversation_id: string };
+
+      // Update local state with the new team
       const creatorProfile: UserProfile = {
         id: userId,
         name: profile.name || 'You',
@@ -194,13 +202,13 @@ export function useMyTeam(
       };
 
       setMyTeam({
-        id: newTeam.id,
-        name: newTeam.name,
-        description: newTeam.description || '',
-        studio: newTeam.studio as Studio,
+        id: rpcResult.team_id,
+        name: validatedData.name,
+        description: validatedData.description || '',
+        studio: validatedData.studio,
         members: [creatorProfile],
         lookingFor: [],
-        skillsNeeded: [],
+        skillsNeeded: validatedData.skillsNeeded,
         createdBy: userId,
       });
 
@@ -214,15 +222,105 @@ export function useMyTeam(
     }
   }, [userId, profile]);
 
-  // Initial fetch
+  /**
+   * Fallback method for team creation (sequential operations)
+   */
+  const createTeamFallback = useCallback(async (validatedData: CreateTeamData) => {
+    if (!userId || !profile) return;
+
+    // 1. Create the team
+    const { data: newTeam, error: teamError } = await supabase
+      .from('teams')
+      .insert({
+        name: validatedData.name,
+        description: validatedData.description,
+        studio: validatedData.studio,
+        looking_for: validatedData.lookingFor,
+        skills_needed: validatedData.skillsNeeded,
+        created_by: userId,
+      })
+      .select()
+      .single();
+
+    if (teamError) throw teamError;
+
+    // 2. Add creator as owner member
+    const { error: memberError } = await supabase
+      .from('team_members')
+      .insert({
+        team_id: newTeam.id,
+        user_id: userId,
+        role: 'owner',
+        status: 'confirmed',
+      });
+
+    if (memberError) throw memberError;
+
+    // 3. Create team conversation
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .insert({
+        type: 'team',
+        team_id: newTeam.id,
+      })
+      .select()
+      .single();
+
+    if (convError) throw convError;
+
+    // 4. Add creator to conversation participants
+    await supabase.from('conversation_participants').insert({
+      conversation_id: conversation.id,
+      user_id: userId,
+    });
+
+    // Update local state
+    const creatorProfile: UserProfile = {
+      id: userId,
+      name: profile.name || 'You',
+      program: (profile.program as Program) || 'MBA',
+      skills: profile.skills || [],
+      bio: profile.bio || '',
+      studioPreference: (profile.studioPreference as Studio) || 'startup',
+      studioPreferences: profile.studioPreferences || [profile.studioPreference || 'startup'],
+      avatar: profile.avatar || '',
+      linkedIn: profile.linkedIn,
+    };
+
+    setMyTeam({
+      id: newTeam.id,
+      name: newTeam.name,
+      description: newTeam.description || '',
+      studio: newTeam.studio as Studio,
+      members: [creatorProfile],
+      lookingFor: [],
+      skillsNeeded: validatedData.skillsNeeded,
+      createdBy: userId,
+    });
+
+    toast.success('Team created!', {
+      description: `You are now the admin of "${validatedData.name}"`,
+    });
+  }, [userId, profile]);
+
+  // Initial fetch and cleanup
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (profile) {
       refreshTeam();
+    } else {
+      setLoading(false);
     }
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [profile, refreshTeam]);
 
   return {
     myTeam,
+    loading,
     setMyTeam,
     createTeam,
     refreshTeam,

@@ -2,14 +2,14 @@
  * useActivityHistory Hook
  * 
  * Manages swipe history for the activity modal.
- * Loads historical swipe data from database and tracks new swipes.
+ * Optimized with parallel queries and proper cleanup.
  * 
  * @param userId - Current authenticated user's ID
  * @param hasProfile - Whether the current user has completed their profile
  * @returns {Object} History state and management functions
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, Team, Program, Studio } from '@/types';
 
@@ -38,21 +38,55 @@ export function useActivityHistory(
 ): UseActivityHistoryResult {
   const [history, setHistory] = useState<SwipeHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
+  const fetchingRef = useRef(false);
 
   /**
-   * Loads activity history from the database
+   * Transforms profile data to UserProfile format
+   */
+  const transformProfile = useCallback((p: any): UserProfile => ({
+    id: p.user_id,
+    name: p.name,
+    program: p.program as Program,
+    skills: p.skills || [],
+    bio: p.bio || '',
+    studioPreference: p.studio_preference as Studio,
+    studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
+    avatar: p.avatar || undefined,
+    linkedIn: p.linkedin || undefined,
+  }), []);
+
+  /**
+   * Transforms team data to Team format
+   */
+  const transformTeam = useCallback((t: any): Team => ({
+    id: t.id,
+    name: t.name,
+    description: t.description || '',
+    studio: t.studio as Studio,
+    members: [],
+    lookingFor: [],
+    skillsNeeded: t.skills_needed || [],
+    createdBy: t.created_by,
+  }), []);
+
+  /**
+   * Loads activity history from the database using optimized queries
    */
   const loadActivityHistory = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || fetchingRef.current) return;
 
+    fetchingRef.current = true;
     setLoading(true);
+    
     try {
       // Fetch all matches made by the user
       const { data: matchesData, error } = await supabase
         .from('matches')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100); // Limit for performance
 
       if (error) {
         console.error('Error loading activity history:', error);
@@ -60,7 +94,10 @@ export function useActivityHistory(
       }
 
       if (!matchesData || matchesData.length === 0) {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setHistory([]);
+          setLoading(false);
+        }
         return;
       }
 
@@ -70,93 +107,77 @@ export function useActivityHistory(
       );
       const teamMatches = matchesData.filter(m => m.match_type === 'individual_to_team');
 
-      // Fetch profiles for individual matches
-      const targetUserIds = individualMatches.map(m => m.target_user_id);
-      let profilesMap: Record<string, any> = {};
+      // Collect IDs for batch fetching
+      const targetUserIds = [...new Set(individualMatches.map(m => m.target_user_id))];
+      const teamIds = [...new Set(teamMatches.map(m => m.team_id).filter(Boolean))] as string[];
 
-      if (targetUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('user_id', targetUserIds);
+      // Parallel fetch profiles and teams
+      const [profilesRes, teamsRes] = await Promise.all([
+        targetUserIds.length > 0
+          ? supabase.from('profiles').select('*').in('user_id', targetUserIds)
+          : Promise.resolve({ data: [] }),
+        teamIds.length > 0
+          ? supabase.from('teams').select('*').in('id', teamIds)
+          : Promise.resolve({ data: [] }),
+      ]);
 
-        (profiles || []).forEach(p => {
-          profilesMap[p.user_id] = p;
-        });
+      // Create lookup maps
+      const profilesMap = new Map(
+        (profilesRes.data || []).map(p => [p.user_id, p])
+      );
+      const teamsMap = new Map(
+        (teamsRes.data || []).map(t => [t.id, t])
+      );
+
+      // Build history items maintaining order
+      const historyItems: SwipeHistory[] = matchesData
+        .map(match => {
+          if (match.match_type === 'individual_to_team') {
+            const team = match.team_id ? teamsMap.get(match.team_id) : null;
+            if (!team) return null;
+            return {
+              type: 'team' as const,
+              item: transformTeam(team),
+              direction: match.status === 'rejected' ? 'left' as const : 'right' as const,
+            };
+          } else {
+            const profile = profilesMap.get(match.target_user_id);
+            if (!profile) return null;
+            return {
+              type: 'user' as const,
+              item: transformProfile(profile),
+              direction: match.status === 'rejected' ? 'left' as const : 'right' as const,
+            };
+          }
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null) as SwipeHistory[];
+
+      if (isMountedRef.current) {
+        setHistory(historyItems);
       }
-
-      // Fetch teams for team matches
-      const teamIds = teamMatches.map(m => m.team_id).filter(Boolean);
-      let teamsMap: Record<string, any> = {};
-
-      if (teamIds.length > 0) {
-        const { data: teamsData } = await supabase
-          .from('teams')
-          .select('*')
-          .in('id', teamIds);
-
-        (teamsData || []).forEach(t => {
-          teamsMap[t.id] = t;
-        });
-      }
-
-      // Build history items
-      const historyItems: SwipeHistory[] = [];
-
-      individualMatches.forEach(match => {
-        const profile = profilesMap[match.target_user_id];
-        if (profile) {
-          historyItems.push({
-            type: 'user',
-            item: {
-              id: profile.user_id,
-              name: profile.name,
-              program: profile.program as Program,
-              skills: profile.skills || [],
-              bio: profile.bio || '',
-              studioPreference: profile.studio_preference as Studio,
-              studioPreferences: (profile.studio_preferences as Studio[]) || [profile.studio_preference as Studio],
-              avatar: profile.avatar || undefined,
-              linkedIn: profile.linkedin || undefined,
-            },
-            direction: match.status === 'rejected' ? 'left' : 'right',
-          });
-        }
-      });
-
-      teamMatches.forEach(match => {
-        const team = match.team_id ? teamsMap[match.team_id] : null;
-        if (team) {
-          historyItems.push({
-            type: 'team',
-            item: {
-              id: team.id,
-              name: team.name,
-              description: team.description || '',
-              studio: team.studio as Studio,
-              members: [],
-              lookingFor: [],
-              skillsNeeded: [],
-              createdBy: team.created_by,
-            },
-            direction: match.status === 'rejected' ? 'left' : 'right',
-          });
-        }
-      });
-
-      setHistory(historyItems);
     } catch (error) {
       console.error('Error loading activity history:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      fetchingRef.current = false;
     }
-  }, [userId]);
+  }, [userId, transformProfile, transformTeam]);
 
-  // Initial load
+  // Initial load and cleanup
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (hasProfile) {
       loadActivityHistory();
+    } else {
+      setLoading(false);
     }
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [hasProfile, loadActivityHistory]);
 
   const addToHistory = useCallback((item: SwipeHistory) => {
