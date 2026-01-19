@@ -2,14 +2,14 @@
  * useProfiles Hook
  * 
  * Fetches and manages user profiles for the matching system.
- * Filters out users who are already in teams or have been swiped on.
+ * Optimized with parallel queries and proper cleanup.
  * 
  * @param userId - Current authenticated user's ID
  * @param hasProfile - Whether the current user has completed their profile
  * @returns {Object} profiles state and loading indicator
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, Program, Studio } from '@/types';
 import { toast } from 'sonner';
@@ -30,6 +30,8 @@ interface UseProfilesResult {
 export function useProfiles(userId: string | undefined, hasProfile: boolean): UseProfilesResult {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
+  const fetchingRef = useRef(false);
 
   /**
    * Transforms a database profile record into a UserProfile object
@@ -47,18 +49,17 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
   }), []);
 
   /**
-   * Fetches profiles from the database, excluding:
-   * - Current user
-   * - Users already in teams
-   * - Users already swiped on
+   * Fetches profiles from the database using parallel queries
    */
   const fetchProfiles = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || fetchingRef.current) return;
 
+    fetchingRef.current = true;
     setLoading(true);
+    
     try {
-      // Parallel fetch: team members and swiped users
-      const [teamMembersRes, swipedMatchesRes] = await Promise.all([
+      // Parallel fetch: all data needed for filtering
+      const [teamMembersRes, swipedMatchesRes, profilesRes] = await Promise.all([
         supabase
           .from('team_members')
           .select('user_id')
@@ -67,42 +68,53 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
           .from('matches')
           .select('target_user_id')
           .eq('user_id', userId)
-          .in('match_type', ['individual_to_individual', 'team_to_individual'])
+          .in('match_type', ['individual_to_individual', 'team_to_individual']),
+        supabase
+          .from('profiles')
+          .select('*')
+          .neq('user_id', userId),
       ]);
 
-      const usersInTeams = new Set((teamMembersRes.data || []).map(tm => tm.user_id));
-      const swipedUserIds = new Set((swipedMatchesRes.data || []).map(m => m.target_user_id));
-
-      // Fetch all profiles except current user
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .neq('user_id', userId);
-
-      if (error) {
-        console.error('Error fetching profiles:', error);
+      if (profilesRes.error) {
+        console.error('Error fetching profiles:', profilesRes.error);
         toast.error('Failed to load profiles');
         return;
       }
 
+      const usersInTeams = new Set((teamMembersRes.data || []).map(tm => tm.user_id));
+      const swipedUserIds = new Set((swipedMatchesRes.data || []).map(m => m.target_user_id));
+
       // Filter and transform profiles
-      const availableProfiles = (data || [])
+      const availableProfiles = (profilesRes.data || [])
         .filter(p => !usersInTeams.has(p.user_id) && !swipedUserIds.has(p.user_id))
         .map(transformProfile);
 
-      setProfiles(availableProfiles);
+      if (isMountedRef.current) {
+        setProfiles(availableProfiles);
+      }
     } catch (error) {
       console.error('Error fetching profiles:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      fetchingRef.current = false;
     }
   }, [userId, transformProfile]);
 
-  // Initial fetch when user has a profile
+  // Initial fetch and cleanup
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (hasProfile) {
       fetchProfiles();
+    } else {
+      setLoading(false);
     }
+
+    return () => {
+      isMountedRef.current = false;
+    };
   }, [hasProfile, fetchProfiles]);
 
   const removeProfile = useCallback((profileId: string) => {

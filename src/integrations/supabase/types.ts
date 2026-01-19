@@ -321,7 +321,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_match_with_conversation: {
+        Args: {
+          p_conversation_type?: string
+          p_match_type: string
+          p_target_user_id: string
+          p_team_id?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      create_team_with_owner: {
+        Args: {
+          p_description: string
+          p_looking_for: string
+          p_name: string
+          p_skills_needed: string[]
+          p_studio: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      get_unread_count: { Args: { p_user_id: string }; Returns: number }
+      upsert_message_read: {
+        Args: { p_conversation_id: string; p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
