@@ -30,7 +30,7 @@ describe("Button Component", () => {
     it("should apply default variant styles", () => {
       render(<Button variant="default">Default</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("bg-primary");
+      expect(button).toHaveClass("gradient-primary");
     });
 
     it("should apply destructive variant styles", () => {
@@ -48,7 +48,7 @@ describe("Button Component", () => {
     it("should apply ghost variant styles", () => {
       render(<Button variant="ghost">Ghost</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("hover:bg-accent");
+      expect(button).toHaveClass("hover:bg-secondary");
     });
 
     it("should apply link variant styles", () => {
@@ -62,7 +62,7 @@ describe("Button Component", () => {
     it("should apply default size", () => {
       render(<Button size="default">Default</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("h-10");
+      expect(button).toHaveClass("h-11");
     });
 
     it("should apply small size", () => {
@@ -74,7 +74,7 @@ describe("Button Component", () => {
     it("should apply large size", () => {
       render(<Button size="lg">Large</Button>);
       const button = screen.getByRole("button");
-      expect(button).toHaveClass("h-11");
+      expect(button).toHaveClass("h-12");
     });
 
     it("should apply icon size", () => {

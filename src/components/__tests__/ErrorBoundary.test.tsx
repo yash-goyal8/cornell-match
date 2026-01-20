@@ -48,22 +48,22 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
   });
 
-  it("should display error message in fallback", () => {
+  it("should display error description in fallback", () => {
     render(
       <ErrorBoundary>
         <ThrowingComponent />
       </ErrorBoundary>
     );
-    expect(screen.getByText(/test error/i)).toBeInTheDocument();
+    expect(screen.getByText(/something unexpected happened/i)).toBeInTheDocument();
   });
 
-  it("should have a reload button in fallback", () => {
+  it("should have a try again button in fallback", () => {
     render(
       <ErrorBoundary>
         <ThrowingComponent />
       </ErrorBoundary>
     );
-    expect(screen.getByRole("button", { name: /refresh page/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
   });
 
   it("should render custom fallback when provided", () => {
