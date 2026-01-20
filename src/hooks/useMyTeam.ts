@@ -202,7 +202,7 @@ export function useMyTeam(
       };
 
       setMyTeam({
-        id: rpcResult.team_id,
+        id: resultData.team_id,
         name: validatedData.name,
         description: validatedData.description || '',
         studio: validatedData.studio,
