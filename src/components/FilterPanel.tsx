@@ -29,7 +29,7 @@ const ALL_SKILLS = [
   "Business Development",
 ];
 
-const ALL_PROGRAMS: Program[] = ["MBA", "CM", "HealthTech", "UrbanTech", "MEng-CS", "MEng-DS", "LLM"];
+const ALL_PROGRAMS: Program[] = ["MEng-CS", "MEng-DSDA", "MEng-ECE", "CM", "DesignTech", "HealthTech", "UrbanTech", "MBA", "LLM"];
 const ALL_STUDIOS: Studio[] = ["bigco", "startup", "pitech"];
 
 export interface PeopleFilters {
