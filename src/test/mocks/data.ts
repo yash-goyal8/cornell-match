@@ -71,12 +71,14 @@ export const mockTeams: Team[] = [
 // ============= Programs & Studios =============
 
 export const allPrograms: Program[] = [
-  "MBA",
+  "MEng-CS",
+  "MEng-DSDA",
+  "MEng-ECE",
   "CM",
+  "DesignTech",
   "HealthTech",
   "UrbanTech",
-  "MEng-CS",
-  "MEng-DS",
+  "MBA",
   "LLM",
 ];
 

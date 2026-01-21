@@ -55,7 +55,9 @@
     --program-healthtech: 150 70% 45%;
     --program-urbantech: 25 90% 55%;
     --program-meng-cs: 200 90% 50%;
-    --program-meng-ds: 260 80% 60%;
+    --program-meng-dsda: 260 80% 60%;
+    --program-meng-ece: 45 85% 55%;
+    --program-designtech: 320 75% 55%;
     --program-llm: 38 92% 50%;
 
     --sidebar-background: 222 47% 8%;

@@ -11,12 +11,14 @@ interface ProgramStepProps {
 }
 
 const programs: { value: Program; label: string; description: string; color: string }[] = [
-  { value: 'MBA', label: 'MBA', description: 'Johnson Cornell Tech MBA', color: 'bg-program-mba' },
+  { value: 'MEng-CS', label: 'MEng in CS', description: 'Master of Engineering in Computer Science', color: 'bg-program-meng-cs' },
+  { value: 'MEng-DSDA', label: 'MEng in DSDA', description: 'Master of Engineering in Data Science & Decision Analytics', color: 'bg-program-meng-dsda' },
+  { value: 'MEng-ECE', label: 'MEng in ECE', description: 'Master of Engineering in Electrical & Computer Engineering', color: 'bg-program-meng-ece' },
   { value: 'CM', label: 'Connective Media', description: 'MS in Information Science', color: 'bg-program-cm' },
+  { value: 'DesignTech', label: 'Design Tech', description: 'MS in Design Technology', color: 'bg-program-designtech' },
   { value: 'HealthTech', label: 'Health Tech', description: 'Health Tech MBA/MS', color: 'bg-program-healthtech' },
   { value: 'UrbanTech', label: 'Urban Tech', description: 'MS in Urban Tech', color: 'bg-program-urbantech' },
-  { value: 'MEng-CS', label: 'MEng in CS', description: 'Master of Engineering in Computer Science', color: 'bg-program-meng-cs' },
-  { value: 'MEng-DS', label: 'MEng in Data Science', description: 'Master of Engineering in Data Science', color: 'bg-program-meng-ds' },
+  { value: 'MBA', label: 'MBA', description: 'Johnson Cornell Tech MBA', color: 'bg-program-mba' },
   { value: 'LLM', label: 'LLM', description: 'Law, Technology & Entrepreneurship', color: 'bg-program-llm' },
 ];
 

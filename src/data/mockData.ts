@@ -95,11 +95,13 @@ export const studioInfo: Record<Studio, { name: string; description: string; col
 };
 
 export const programColors: Record<Program, string> = {
-  MBA: 'bg-program-mba',
+  'MEng-CS': 'bg-program-meng-cs',
+  'MEng-DSDA': 'bg-program-meng-dsda',
+  'MEng-ECE': 'bg-program-meng-ece',
   CM: 'bg-program-cm',
+  DesignTech: 'bg-program-designtech',
   HealthTech: 'bg-program-healthtech',
   UrbanTech: 'bg-program-urbantech',
-  'MEng-CS': 'bg-program-meng-cs',
-  'MEng-DS': 'bg-program-meng-ds',
+  MBA: 'bg-program-mba',
   LLM: 'bg-program-llm',
 };

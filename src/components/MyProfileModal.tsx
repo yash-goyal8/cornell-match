@@ -17,12 +17,14 @@ interface MyProfileModalProps {
 }
 
 const programs: { value: Program; label: string }[] = [
-  { value: 'MBA', label: 'MBA' },
+  { value: 'MEng-CS', label: 'MEng in CS' },
+  { value: 'MEng-DSDA', label: 'MEng in DSDA' },
+  { value: 'MEng-ECE', label: 'MEng in ECE' },
   { value: 'CM', label: 'Connective Media' },
+  { value: 'DesignTech', label: 'Design Tech' },
   { value: 'HealthTech', label: 'Health Tech' },
   { value: 'UrbanTech', label: 'Urban Tech' },
-  { value: 'MEng-CS', label: 'M.Eng in CS' },
-  { value: 'MEng-DS', label: 'M.Eng in Data Science' },
+  { value: 'MBA', label: 'MBA' },
   { value: 'LLM', label: 'LLM' },
 ];
 
