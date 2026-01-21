@@ -12,7 +12,7 @@ export interface Message {
 
 export interface Conversation {
   id: string;
-  type: 'direct' | 'team';
+  type: 'direct' | 'team' | 'match';
   team_id?: string;
   match_id?: string;
   created_at: string;

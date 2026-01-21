@@ -106,7 +106,7 @@ export const ChatList = ({
                   // For join requests, show the individual's name with team context
                   displayName = conversation.match.individual_profile?.name || 'Unknown';
                   displayAvatar = conversation.match.individual_profile?.avatar || '';
-                } else if (conversation.type === 'direct') {
+                } else if (conversation.type === 'direct' || conversation.type === 'match') {
                   displayName = conversation.other_user?.name || 'Unknown';
                   displayAvatar = conversation.other_user?.avatar || '';
                 } else {

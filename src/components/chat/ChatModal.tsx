@@ -238,7 +238,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
                     }
                   }
                 }
-              } else if (conv.type === 'direct') {
+              } else if (conv.type === 'direct' || conv.type === 'match') {
                 // Regular direct conversation
                 const { data: participants } = await supabase
                   .from('conversation_participants')
@@ -289,7 +289,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
 
               return {
                 ...conv,
-                type: conv.type as 'direct' | 'team',
+                type: conv.type as 'direct' | 'team' | 'match',
                 other_user: otherUser,
                 team,
                 match,
@@ -472,7 +472,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
     // Also check by other_user for backwards compatibility
     const existingConv = conversations.find(
       (c) =>
-        c.type === 'direct' &&
+        (c.type === 'direct' || c.type === 'match') &&
         c.other_user?.id === otherUserId
     );
 
@@ -484,11 +484,11 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
     try {
       setIsLoading(true);
 
-      // Create conversation linked to the match
+      // Create conversation linked to the match - use 'match' type for RLS policy
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .insert({ 
-          type: 'direct',
+          type: 'match',
           match_id: match.id 
         })
         .select()
@@ -508,7 +508,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
 
       const newConversation: Conversation = {
         id: conversation.id,
-        type: conversation.type as 'direct' | 'team',
+        type: conversation.type as 'direct' | 'team' | 'match',
         team_id: conversation.team_id || undefined,
         match_id: conversation.match_id || undefined,
         created_at: conversation.created_at,
