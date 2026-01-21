@@ -61,11 +61,11 @@ export const ChatRoom = ({
     }
   };
 
-  const chatName = conversation.type === 'direct' 
+  const chatName = (conversation.type === 'direct' || conversation.type === 'match')
     ? conversation.other_user?.name 
     : conversation.team?.name;
 
-  const chatAvatar = conversation.type === 'direct'
+  const chatAvatar = (conversation.type === 'direct' || conversation.type === 'match')
     ? conversation.other_user?.avatar
     : undefined;
 
@@ -89,7 +89,7 @@ export const ChatRoom = ({
         <Avatar className="w-10 h-10">
           <AvatarImage src={chatAvatar} />
           <AvatarFallback className="bg-primary/10 text-primary">
-            {conversation.type === 'direct' 
+            {(conversation.type === 'direct' || conversation.type === 'match')
               ? chatName?.charAt(0) || '?'
               : <Users className="w-4 h-4" />
             }
