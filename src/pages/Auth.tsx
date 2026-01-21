@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -16,19 +16,26 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  
+  // Use ref to track recovery mode to avoid stale closure issues
+  const isRecoveryModeRef = useRef(false);
 
   useEffect(() => {
-    // Check for recovery token in URL hash first
+    // Check for recovery token in URL hash or query params
     const hash = window.location.hash;
-    const isRecoveryFlow = hash && (hash.includes('type=recovery') || hash.includes('type=magiclink'));
+    const searchParams = new URLSearchParams(window.location.search);
+    const isRecoveryFlow = 
+      (hash && (hash.includes('type=recovery') || hash.includes('type=magiclink'))) ||
+      searchParams.get('reset') === 'true';
     
     if (isRecoveryFlow) {
-      // Don't redirect, wait for PASSWORD_RECOVERY event
+      // Mark as recovery mode and wait for PASSWORD_RECOVERY event
+      isRecoveryModeRef.current = true;
       setCheckingAuth(false);
     } else {
       // Check if already logged in (only if not recovery flow)
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
+        if (session && !isRecoveryModeRef.current) {
           navigate('/');
         }
         setCheckingAuth(false);
@@ -38,23 +45,27 @@ const Auth = () => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth event:', event);
+      
       if (event === 'PASSWORD_RECOVERY') {
         // User clicked the password reset link - show update password form
+        isRecoveryModeRef.current = true;
         setMode('update-password');
         setCheckingAuth(false);
         return;
       }
-      if (event === 'SIGNED_IN' && mode === 'update-password') {
-        // Stay on update password form after password is updated
+      
+      // Don't redirect if we're in recovery mode
+      if (isRecoveryModeRef.current) {
         return;
       }
-      if (session && mode !== 'update-password' && !isRecoveryFlow) {
+      
+      if (event === 'SIGNED_IN' && session) {
         navigate('/');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, mode]);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,8 +88,15 @@ const Auth = () => {
       try {
         const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
-        toast.success('Password updated successfully!');
-        navigate('/');
+        
+        // Clear recovery mode and sign out to force fresh login with new password
+        isRecoveryModeRef.current = false;
+        await supabase.auth.signOut();
+        
+        toast.success('Password updated successfully! Please log in with your new password.');
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
       } catch (error: any) {
         console.error('Password update error:', error);
         toast.error(error.message || 'Failed to update password');
@@ -145,14 +163,7 @@ const Auth = () => {
     }
   };
 
-  // Handle password reset from email link
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      // Supabase recovery link detected - the onAuthStateChange will handle it
-      setCheckingAuth(true);
-    }
-  }, []);
+  // Remove the second useEffect - logic is now consolidated above
 
   if (checkingAuth) {
     return (
