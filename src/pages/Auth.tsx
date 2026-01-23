@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Loader2, Users, ArrowLeft } from 'lucide-react';
-
+import { Loader2, Users, ArrowLeft, Shield } from 'lucide-react';
+import { validatePasswordStrength, logSecurityEvent } from '@/lib/security';
+import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 const Auth = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'update-password'>('login');
@@ -75,10 +76,14 @@ const Auth = () => {
         toast.error('Please enter a new password');
         return;
       }
-      if (password.length < 6) {
-        toast.error('Password must be at least 6 characters');
+      
+      // Validate password strength
+      const strength = validatePasswordStrength(password);
+      if (!strength.isValid) {
+        toast.error(strength.feedback[0] || 'Password does not meet requirements');
         return;
       }
+      
       if (password !== confirmPassword) {
         toast.error('Passwords do not match');
         return;
@@ -88,6 +93,9 @@ const Auth = () => {
       try {
         const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
+        
+        // Log the password change
+        await logSecurityEvent('password_changed');
         
         // Clear recovery mode and sign out to force fresh login with new password
         isRecoveryModeRef.current = false;
@@ -116,7 +124,14 @@ const Auth = () => {
       return;
     }
 
-    if (mode !== 'forgot' && password.length < 6) {
+    // For signup, validate password strength
+    if (mode === 'signup') {
+      const strength = validatePasswordStrength(password);
+      if (!strength.isValid) {
+        toast.error(strength.feedback[0] || 'Password does not meet requirements');
+        return;
+      }
+    } else if (mode === 'login' && password.length < 6) {
       toast.error('Password must be at least 6 characters');
       return;
     }
@@ -264,6 +279,9 @@ const Auth = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
                 />
+                {(mode === 'signup' || mode === 'update-password') && (
+                  <PasswordStrengthMeter password={password} />
+                )}
               </div>
             )}
 
