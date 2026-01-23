@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: unknown
+          metadata: Json | null
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: unknown
+          metadata?: Json | null
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -84,6 +126,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      data_requests: {
+        Row: {
+          download_url: string | null
+          expires_at: string | null
+          id: string
+          metadata: Json | null
+          processed_at: string | null
+          request_type: string
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          download_url?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          processed_at?: string | null
+          request_type: string
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          download_url?: string | null
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          processed_at?: string | null
+          request_type?: string
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       matches: {
         Row: {
@@ -235,6 +313,36 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          action: string
+          attempts: number | null
+          blocked_until: string | null
+          first_attempt_at: string
+          id: string
+          identifier: string
+          last_attempt_at: string
+        }
+        Insert: {
+          action: string
+          attempts?: number | null
+          blocked_until?: string | null
+          first_attempt_at?: string
+          id?: string
+          identifier: string
+          last_attempt_at?: string
+        }
+        Update: {
+          action?: string
+          attempts?: number | null
+          blocked_until?: string | null
+          first_attempt_at?: string
+          id?: string
+          identifier?: string
+          last_attempt_at?: string
+        }
+        Relationships: []
+      }
       team_members: {
         Row: {
           created_at: string
@@ -316,11 +424,84 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          created_at: string
+          device_info: Json | null
+          expires_at: string | null
+          id: string
+          ip_address: unknown
+          is_revoked: boolean | null
+          last_active_at: string
+          session_token: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_info?: Json | null
+          expires_at?: string | null
+          id?: string
+          ip_address?: unknown
+          is_revoked?: boolean | null
+          last_active_at?: string
+          session_token: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_info?: Json | null
+          expires_at?: string | null
+          id?: string
+          ip_address?: unknown
+          is_revoked?: boolean | null
+          last_active_at?: string
+          session_token?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_action: string
+          p_block_minutes?: number
+          p_identifier: string
+          p_max_attempts?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       create_match_with_conversation: {
         Args: {
           p_conversation_type?: string
@@ -342,14 +523,33 @@ export type Database = {
         }
         Returns: Json
       }
+      export_user_data: { Args: { p_user_id: string }; Returns: Json }
       get_unread_count: { Args: { p_user_id: string }; Returns: number }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      log_audit_event: {
+        Args: {
+          p_action: string
+          p_metadata?: Json
+          p_new_data?: Json
+          p_old_data?: Json
+          p_record_id?: string
+          p_table_name?: string
+        }
+        Returns: string
+      }
       upsert_message_read: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -476,6 +676,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
