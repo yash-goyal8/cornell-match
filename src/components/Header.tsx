@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
-import { Users, User, MessageCircle, UserCircle, LogOut } from 'lucide-react';
+import { Users, User, MessageCircle, UserCircle, LogOut, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -15,11 +16,12 @@ interface HeaderProps {
   unreadCount?: number;
   onProfileClick?: () => void;
   onChatClick?: () => void;
+  onPrivacyClick?: () => void;
   userAvatar?: string;
   onSignOut?: () => void;
 }
 
-export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0, onProfileClick, onChatClick, userAvatar, onSignOut }: HeaderProps) => {
+export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0, onProfileClick, onChatClick, onPrivacyClick, userAvatar, onSignOut }: HeaderProps) => {
   const hasNotifications = matchCount > 0 || unreadCount > 0;
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
@@ -100,6 +102,11 @@ export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0
                   <UserCircle className="w-4 h-4 mr-2" />
                   My Profile
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={onPrivacyClick}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Privacy & Security
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onSignOut} className="text-destructive">
                   <LogOut className="w-4 h-4 mr-2" />
                   Sign Out
