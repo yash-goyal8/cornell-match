@@ -29,6 +29,7 @@ import { CreateTeamModal } from '@/components/CreateTeamModal';
 import { TeamManagementModal } from '@/components/TeamManagementModal';
 import { ActivityModal } from '@/components/ActivityModal';
 import { FilterPanel, PeopleFilters, TeamFilters } from '@/components/FilterPanel';
+import { PrivacySettingsModal } from '@/components/PrivacySettingsModal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -81,6 +82,7 @@ const Index = () => {
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
 
   // Filter state
   const [peopleFilters, setPeopleFilters] = useState<PeopleFilters>({
@@ -401,6 +403,7 @@ const Index = () => {
         unreadCount={unreadCount}
         onProfileClick={() => setIsMyProfileOpen(true)}
         onChatClick={() => setIsChatOpen(true)}
+        onPrivacyClick={() => setIsPrivacyOpen(true)}
         userAvatar={profile?.avatar}
         onSignOut={signOut}
       />
@@ -641,6 +644,12 @@ const Index = () => {
         history={history}
         onUndo={handleUndoByIndex}
         activeTabContext={activeTab}
+      />
+
+      {/* Privacy & Security Modal */}
+      <PrivacySettingsModal
+        isOpen={isPrivacyOpen}
+        onClose={() => setIsPrivacyOpen(false)}
       />
     </div>
   );
