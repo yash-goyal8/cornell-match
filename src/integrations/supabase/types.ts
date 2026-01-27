@@ -543,6 +543,7 @@ export type Database = {
         }
         Returns: string
       }
+      sanitize_audit_data: { Args: { p_data: Json }; Returns: Json }
       upsert_message_read: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: undefined
