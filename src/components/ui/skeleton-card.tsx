@@ -4,6 +4,7 @@
  * Loading placeholders for cards and lists to improve perceived performance.
  */
 
+import { forwardRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -13,38 +14,42 @@ interface SkeletonCardProps {
 }
 
 /**
- * Skeleton for profile cards
+ * Skeleton for profile cards - forwardRef to prevent React warnings
  */
-export function ProfileCardSkeleton({ className }: SkeletonCardProps) {
-  return (
-    <Card className={cn("w-full max-w-sm overflow-hidden", className)}>
-      {/* Avatar area */}
-      <Skeleton className="h-48 sm:h-64 w-full rounded-none" />
-      
-      <CardContent className="p-4 space-y-3">
-        {/* Name and program */}
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-        </div>
+export const ProfileCardSkeleton = forwardRef<HTMLDivElement, SkeletonCardProps>(
+  ({ className }, ref) => {
+    return (
+      <Card ref={ref} className={cn("w-full max-w-sm overflow-hidden", className)}>
+        {/* Avatar area */}
+        <Skeleton className="h-48 sm:h-64 w-full rounded-none" />
         
-        {/* Bio */}
-        <div className="space-y-1.5">
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-2/3" />
-        </div>
-        
-        {/* Skills badges */}
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-6 w-20 rounded-full" />
-          <Skeleton className="h-6 w-14 rounded-full" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+        <CardContent className="p-4 space-y-3">
+          {/* Name and program */}
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+          
+          {/* Bio */}
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+          
+          {/* Skills badges */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+            <Skeleton className="h-6 w-14 rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+);
+
+ProfileCardSkeleton.displayName = 'ProfileCardSkeleton';
 
 /**
  * Skeleton for team cards

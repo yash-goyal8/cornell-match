@@ -11,7 +11,7 @@
  * @module pages/Index
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, History } from 'lucide-react';
@@ -59,7 +59,7 @@ import { profileSchema, validateInput } from '@/lib/validation';
  * - Filtering and activity history
  * - Team creation and management
  */
-const Index = () => {
+const Index = forwardRef<HTMLDivElement>((_, ref) => {
   // ============================================================================
   // AUTH & NAVIGATION
   // ============================================================================
@@ -362,39 +362,23 @@ const Index = () => {
   // LOADING & AUTH STATES
   // ============================================================================
 
-  // Only block on initial auth check - profile can load in background
+  // Only block on initial auth check
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return null; // App.tsx Suspense shows PageSkeleton
   }
 
   if (!user) {
     return null;
   }
   
-  // Show onboarding if profile is loaded and doesn't exist
-  // But if profile is still loading, show a brief loading state
-  if (profileLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-muted-foreground text-sm">Loading your profile...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Show onboarding if no profile exists
-  if (!profile) {
+  // Show onboarding if no profile exists (profileLoading=false means we checked)
+  if (!profileLoading && !profile) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
   
   // Track if data is still loading (for showing skeleton states)
-  const isDataLoading = loadingProfiles || loadingTeams;
+  // Include profileLoading to show skeleton while profile is being fetched
+  const isDataLoading = profileLoading || loadingProfiles || loadingTeams;
 
   // ============================================================================
   // RENDER HELPERS
@@ -682,6 +666,8 @@ const Index = () => {
       />
     </div>
   );
-};
+});
+
+Index.displayName = 'Index';
 
 export default Index;
