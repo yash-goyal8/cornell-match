@@ -1,12 +1,41 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Users, Sparkles, Target, Zap } from 'lucide-react';
+import { Users, Sparkles, Target, Zap, Loader2 } from 'lucide-react';
 
 interface WelcomeStepProps {
   onNext: () => void;
 }
 
+const WELCOME_DISPLAY_TIME = 3000; // 3 seconds
+
 export const WelcomeStep = ({ onNext }: WelcomeStepProps) => {
+  const [isReady, setIsReady] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+
+  useEffect(() => {
+    // Start countdown timer
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Enable button after display time
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, WELCOME_DISPLAY_TIME);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
+
   const features = [
     { icon: Users, text: 'Find teammates from different programs' },
     { icon: Target, text: 'Match with BigCo, Startup, or PiTech studios' },
@@ -50,8 +79,20 @@ export const WelcomeStep = ({ onNext }: WelcomeStepProps) => {
         ))}
       </div>
 
-      <Button size="xl" onClick={onNext} className="w-full">
-        Get Started
+      <Button 
+        size="xl" 
+        onClick={onNext} 
+        className="w-full" 
+        disabled={!isReady}
+      >
+        {!isReady ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            Get Started in {countdown}s
+          </>
+        ) : (
+          'Get Started'
+        )}
       </Button>
     </div>
   );
