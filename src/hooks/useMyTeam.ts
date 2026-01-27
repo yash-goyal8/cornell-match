@@ -41,9 +41,10 @@ export function useMyTeam(
   profile: any
 ): UseMyTeamResult {
   const [myTeam, setMyTeam] = useState<Team | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
+  const initialFetchDone = useRef(false);
 
   /**
    * Transforms member profiles from database format to UserProfile
@@ -69,7 +70,11 @@ export function useMyTeam(
     if (!userId || fetchingRef.current) return;
     
     fetchingRef.current = true;
-    setLoading(true);
+    
+    // Only show loading on initial fetch
+    if (!initialFetchDone.current) {
+      setLoading(true);
+    }
 
     try {
       // Check if user is a member of any team
@@ -85,7 +90,7 @@ export function useMyTeam(
       if (!membership) {
         if (isMountedRef.current) {
           setMyTeam(null);
-          setLoading(false);
+          initialFetchDone.current = true;
         }
         return;
       }
@@ -94,7 +99,7 @@ export function useMyTeam(
       const [teamRes, membersRes] = await Promise.all([
         supabase
           .from('teams')
-          .select('*')
+          .select('id, name, description, studio, skills_needed, created_by')
           .eq('id', membership.team_id)
           .single(),
         supabase
@@ -110,7 +115,7 @@ export function useMyTeam(
       if (!teamData) {
         if (isMountedRef.current) {
           setMyTeam(null);
-          setLoading(false);
+          initialFetchDone.current = true;
         }
         return;
       }
@@ -122,7 +127,7 @@ export function useMyTeam(
       if (memberUserIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('*')
+          .select('user_id, name, program, skills, bio, studio_preference, studio_preferences, avatar, linkedin')
           .in('user_id', memberUserIds);
 
         teamMembers = transformMemberProfiles(profiles || []);
@@ -139,6 +144,7 @@ export function useMyTeam(
           skillsNeeded: teamData.skills_needed || [],
           createdBy: teamData.created_by,
         });
+        initialFetchDone.current = true;
       }
     } catch (error) {
       console.error('Error refreshing team:', error);
@@ -168,7 +174,7 @@ export function useMyTeam(
     const validatedData = (validation as { success: true; data: typeof teamData }).data;
 
     try {
-      // Try to use the optimized RPC function first
+      // Use the optimized RPC function
       const { data: rpcResult, error: rpcError } = await supabase.rpc('create_team_with_owner', {
         p_name: validatedData.name,
         p_description: validatedData.description,
@@ -179,7 +185,6 @@ export function useMyTeam(
       });
 
       if (rpcError) {
-        // Fallback to sequential operations if RPC fails
         console.warn('RPC failed, using fallback:', rpcError);
         await createTeamFallback(validatedData);
         return;
@@ -303,12 +308,20 @@ export function useMyTeam(
     });
   }, [userId, profile]);
 
-  // Initial fetch and cleanup
+  // Initial fetch and cleanup - deferred to not block main content
   useEffect(() => {
     isMountedRef.current = true;
     
-    if (profile) {
-      refreshTeam();
+    if (profile && userId) {
+      // Defer team fetch slightly to prioritize main content
+      const timeoutId = setTimeout(() => {
+        refreshTeam();
+      }, 50);
+      
+      return () => {
+        isMountedRef.current = false;
+        clearTimeout(timeoutId);
+      };
     } else {
       setLoading(false);
     }
@@ -316,7 +329,7 @@ export function useMyTeam(
     return () => {
       isMountedRef.current = false;
     };
-  }, [profile, refreshTeam]);
+  }, [profile, userId, refreshTeam]);
 
   return {
     myTeam,

@@ -2,7 +2,7 @@
  * useActivityHistory Hook
  * 
  * Manages swipe history for the activity modal.
- * Optimized with parallel queries and proper cleanup.
+ * Deferred loading to not block main content.
  * 
  * @param userId - Current authenticated user's ID
  * @param hasProfile - Whether the current user has completed their profile
@@ -37,7 +37,7 @@ export function useActivityHistory(
   hasProfile: boolean
 ): UseActivityHistoryResult {
   const [history, setHistory] = useState<SwipeHistory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
 
@@ -83,10 +83,10 @@ export function useActivityHistory(
       // Fetch all matches made by the user
       const { data: matchesData, error } = await supabase
         .from('matches')
-        .select('*')
+        .select('target_user_id, team_id, match_type, status, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(100); // Limit for performance
+        .limit(50); // Reduced limit for faster loading
 
       if (error) {
         console.error('Error loading activity history:', error);
@@ -96,7 +96,6 @@ export function useActivityHistory(
       if (!matchesData || matchesData.length === 0) {
         if (isMountedRef.current) {
           setHistory([]);
-          setLoading(false);
         }
         return;
       }
@@ -114,10 +113,10 @@ export function useActivityHistory(
       // Parallel fetch profiles and teams
       const [profilesRes, teamsRes] = await Promise.all([
         targetUserIds.length > 0
-          ? supabase.from('profiles').select('*').in('user_id', targetUserIds)
+          ? supabase.from('profiles').select('user_id, name, program, skills, bio, studio_preference, studio_preferences, avatar, linkedin').in('user_id', targetUserIds)
           : Promise.resolve({ data: [] }),
         teamIds.length > 0
-          ? supabase.from('teams').select('*').in('id', teamIds)
+          ? supabase.from('teams').select('id, name, description, studio, skills_needed, created_by').in('id', teamIds)
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -165,20 +164,26 @@ export function useActivityHistory(
     }
   }, [userId, transformProfile, transformTeam]);
 
-  // Initial load and cleanup
+  // Deferred load - activity history is not critical for initial render
   useEffect(() => {
     isMountedRef.current = true;
     
-    if (hasProfile) {
-      loadActivityHistory();
-    } else {
-      setLoading(false);
+    if (hasProfile && userId) {
+      // Defer activity history loading significantly
+      const timeoutId = setTimeout(() => {
+        loadActivityHistory();
+      }, 500);
+      
+      return () => {
+        isMountedRef.current = false;
+        clearTimeout(timeoutId);
+      };
     }
 
     return () => {
       isMountedRef.current = false;
     };
-  }, [hasProfile, loadActivityHistory]);
+  }, [hasProfile, userId, loadActivityHistory]);
 
   const addToHistory = useCallback((item: SwipeHistory) => {
     setHistory(prev => [...prev, item]);

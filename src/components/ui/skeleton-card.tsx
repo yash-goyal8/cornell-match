@@ -19,7 +19,7 @@ export function ProfileCardSkeleton({ className }: SkeletonCardProps) {
   return (
     <Card className={cn("w-full max-w-sm overflow-hidden", className)}>
       {/* Avatar area */}
-      <Skeleton className="h-64 w-full rounded-none" />
+      <Skeleton className="h-48 sm:h-64 w-full rounded-none" />
       
       <CardContent className="p-4 space-y-3">
         {/* Name and program */}
@@ -126,14 +126,14 @@ export function MessageSkeleton({ isOwn = false }: { isOwn?: boolean }) {
  */
 export function SwipeStackSkeleton() {
   return (
-    <div className="relative h-[500px] flex items-center justify-center">
+    <div className="relative h-[420px] sm:h-[460px] flex items-center justify-center">
       {/* Background card */}
       <div className="absolute w-full max-w-sm transform scale-95 translate-y-2 opacity-60">
-        <ProfileCardSkeleton />
+        <ProfileCardSkeleton className="h-[400px] sm:h-[440px]" />
       </div>
       {/* Front card */}
-      <div className="absolute w-full max-w-sm z-10">
-        <ProfileCardSkeleton />
+      <div className="absolute w-full max-w-sm z-10 animate-pulse">
+        <ProfileCardSkeleton className="h-[400px] sm:h-[440px]" />
       </div>
     </div>
   );
