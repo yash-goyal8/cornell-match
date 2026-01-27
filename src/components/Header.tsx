@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { InitialsAvatar } from '@/components/InitialsAvatar';
 
 interface HeaderProps {
   activeTab: 'individuals' | 'teams';
@@ -18,10 +19,11 @@ interface HeaderProps {
   onChatClick?: () => void;
   onPrivacyClick?: () => void;
   userAvatar?: string;
+  userName?: string;
   onSignOut?: () => void;
 }
 
-export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0, onProfileClick, onChatClick, onPrivacyClick, userAvatar, onSignOut }: HeaderProps) => {
+export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0, onProfileClick, onChatClick, onPrivacyClick, userAvatar, userName = 'User', onSignOut }: HeaderProps) => {
   const hasNotifications = matchCount > 0 || unreadCount > 0;
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
@@ -90,8 +92,12 @@ export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0
                   size="icon" 
                   className="rounded-full overflow-hidden w-10 h-10 p-0"
                 >
-                  {userAvatar ? (
-                    <img src={userAvatar} alt="Your profile" className="w-full h-full object-cover" />
+                  {userAvatar || userName ? (
+                    <InitialsAvatar 
+                      name={userName} 
+                      src={userAvatar} 
+                      className="w-full h-full rounded-full text-sm"
+                    />
                   ) : (
                     <UserCircle className="w-6 h-6" />
                   )}
