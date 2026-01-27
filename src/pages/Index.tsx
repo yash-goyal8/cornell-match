@@ -405,6 +405,7 @@ const Index = () => {
         onChatClick={() => setIsChatOpen(true)}
         onPrivacyClick={() => setIsPrivacyOpen(true)}
         userAvatar={profile?.avatar}
+        userName={profile?.name}
         onSignOut={signOut}
       />
 

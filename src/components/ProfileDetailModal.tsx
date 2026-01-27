@@ -5,6 +5,7 @@ import { programColors, studioInfo } from '@/data/mockData';
 import { X, Sparkles, MapPin, Linkedin, GraduationCap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { InitialsAvatar } from '@/components/InitialsAvatar';
 
 interface ProfileDetailModalProps {
   profile: UserProfile | null;
@@ -61,10 +62,10 @@ export const ProfileDetailModal = forwardRef<HTMLDivElement, ProfileDetailModalP
               <div className="flex-1 overflow-y-auto">
                 {/* Hero Image */}
                 <div className="relative h-80">
-                  <img
+                  <InitialsAvatar
+                    name={profile.name}
                     src={profile.avatar}
-                    alt={profile.name}
-                    className="w-full h-full object-cover object-top"
+                    className="w-full h-full text-8xl"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
                   

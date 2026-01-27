@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { InitialsAvatar } from '@/components/InitialsAvatar';
 
 interface MyProfileModalProps {
   profile: Omit<UserProfile, 'id'> | null;
@@ -157,10 +158,10 @@ export const MyProfileModal = ({ profile, isOpen, onClose, onSave }: MyProfileMo
               <div className="flex-1 overflow-y-auto">
                 {/* Hero Image */}
                 <div className="relative h-72">
-                  <img
+                  <InitialsAvatar
+                    name={displayProfile.name}
                     src={displayProfile.avatar}
-                    alt={displayProfile.name}
-                    className="w-full h-full object-cover object-top"
+                    className="w-full h-full text-7xl"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
                   

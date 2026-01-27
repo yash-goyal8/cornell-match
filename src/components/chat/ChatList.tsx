@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion';
 import { MessageCircle, Users, ChevronLeft, UserPlus } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Conversation, Match } from '@/types/chat';
+import { InitialsAvatar } from '@/components/InitialsAvatar';
 import { cn } from '@/lib/utils';
 
 interface ChatListProps {
@@ -124,15 +124,17 @@ export const ChatList = ({
                     whileTap={{ scale: 0.98 }}
                   >
                     <div className="relative">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={displayAvatar} />
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {conversation.type === 'team' && !isJoinRequest
-                            ? <Users className="w-5 h-5" />
-                            : displayName?.charAt(0) || '?'
-                          }
-                        </AvatarFallback>
-                      </Avatar>
+                      {conversation.type === 'team' && !isJoinRequest ? (
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="w-5 h-5 text-primary" />
+                        </div>
+                      ) : (
+                        <InitialsAvatar
+                          name={displayName}
+                          src={displayAvatar}
+                          className="w-12 h-12 rounded-full text-lg"
+                        />
+                      )}
                       {isJoinRequest && (
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
                           <UserPlus className="w-3 h-3 text-primary-foreground" />
@@ -192,12 +194,11 @@ export const ChatList = ({
                   className="w-full p-4 flex items-center gap-3 hover:bg-accent/50 transition-colors text-left"
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={match.target_profile?.avatar} />
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {match.target_profile?.name?.charAt(0) || '?'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <InitialsAvatar
+                    name={match.target_profile?.name || 'Unknown'}
+                    src={match.target_profile?.avatar}
+                    className="w-12 h-12 rounded-full text-lg"
+                  />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-foreground truncate">
                       {match.target_profile?.name}

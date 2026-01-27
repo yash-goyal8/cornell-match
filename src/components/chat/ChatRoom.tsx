@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Send, Users } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Message, Conversation, JoinRequestMatch } from '@/types/chat';
 import { JoinRequestBanner } from './JoinRequestBanner';
+import { InitialsAvatar } from '@/components/InitialsAvatar';
 import { cn } from '@/lib/utils';
 
 interface ChatRoomProps {
@@ -86,15 +86,17 @@ export const ChatRoom = ({
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ChevronLeft className="w-5 h-5" />
         </Button>
-        <Avatar className="w-10 h-10">
-          <AvatarImage src={chatAvatar} />
-          <AvatarFallback className="bg-primary/10 text-primary">
-            {(conversation.type === 'direct' || conversation.type === 'match')
-              ? chatName?.charAt(0) || '?'
-              : <Users className="w-4 h-4" />
-            }
-          </AvatarFallback>
-        </Avatar>
+        {(conversation.type === 'direct' || conversation.type === 'match') ? (
+          <InitialsAvatar
+            name={chatName || 'Unknown'}
+            src={chatAvatar}
+            className="w-10 h-10 rounded-full text-sm"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <Users className="w-4 h-4 text-primary" />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-foreground truncate">{chatName}</h2>
           {conversation.type === 'team' && (
@@ -151,12 +153,11 @@ export const ChatRoom = ({
                       {!isOwn && (
                         <div className="w-8">
                           {showAvatar && (
-                            <Avatar className="w-8 h-8">
-                              <AvatarImage src={message.sender?.avatar} />
-                              <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                                {message.sender?.name?.charAt(0) || '?'}
-                              </AvatarFallback>
-                            </Avatar>
+                            <InitialsAvatar
+                              name={message.sender?.name || 'Unknown'}
+                              src={message.sender?.avatar}
+                              className="w-8 h-8 rounded-full text-xs"
+                            />
                           )}
                         </div>
                       )}

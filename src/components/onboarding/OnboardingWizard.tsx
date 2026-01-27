@@ -52,7 +52,7 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
         bio: formData.bio,
         studioPreference: formData.studioPreferences[0], // Primary preference
         studioPreferences: formData.studioPreferences,
-        avatar: formData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop',
+        avatar: formData.avatar || '', // Empty string triggers initials avatar
         linkedIn: formData.linkedIn || undefined,
       });
     }
