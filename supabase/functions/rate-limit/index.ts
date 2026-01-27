@@ -41,16 +41,29 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate action format (alphanumeric and underscores only, max 50 chars)
+    if (!/^[a-zA-Z0-9_]{1,50}$/.test(body.action)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid action format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Use provided identifier or fall back to IP
     const identifier = body.identifier || clientIp;
     
-    // Call the rate limit check function
+    // Validate and constrain numeric inputs to prevent injection and DoS
+    const maxAttempts = Math.max(1, Math.min(Math.floor(body.maxAttempts || 5), 100));
+    const windowMinutes = Math.max(1, Math.min(Math.floor(body.windowMinutes || 15), 1440)); // Max 24 hours
+    const blockMinutes = Math.max(1, Math.min(Math.floor(body.blockMinutes || 30), 10080)); // Max 1 week
+    
+    // Call the rate limit check function with validated inputs
     const { data, error } = await supabase.rpc('check_rate_limit', {
       p_identifier: identifier,
       p_action: body.action,
-      p_max_attempts: body.maxAttempts || 5,
-      p_window_minutes: body.windowMinutes || 15,
-      p_block_minutes: body.blockMinutes || 30,
+      p_max_attempts: maxAttempts,
+      p_window_minutes: windowMinutes,
+      p_block_minutes: blockMinutes,
     });
 
     if (error) {
