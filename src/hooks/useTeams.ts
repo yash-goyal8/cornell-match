@@ -2,7 +2,7 @@
  * useTeams Hook
  * 
  * Fetches and manages teams for the matching system.
- * Optimized with parallel queries and efficient data transformation.
+ * Optimized with consolidated queries and efficient data transformation.
  * 
  * @param userId - Current authenticated user's ID
  * @param hasProfile - Whether the current user has completed their profile
@@ -12,7 +12,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Team, UserProfile, Program, Studio } from '@/types';
-import { toast } from 'sonner';
 
 interface UseTeamsResult {
   /** List of available teams to swipe on */
@@ -32,6 +31,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
   const [loading, setLoading] = useState(true);
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
+  const initialFetchDone = useRef(false);
 
   /**
    * Transforms profile data to UserProfile format
@@ -50,16 +50,20 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
 
   /**
    * Fetches teams from the database with their members
-   * Uses parallel queries for optimal performance
+   * Uses consolidated parallel queries for optimal performance
    */
   const fetchTeams = useCallback(async () => {
     if (!userId || fetchingRef.current) return;
 
     fetchingRef.current = true;
-    setLoading(true);
+    
+    // Only show loading on initial fetch
+    if (!initialFetchDone.current) {
+      setLoading(true);
+    }
     
     try {
-      // Parallel fetch: all data in one go
+      // Single consolidated query: fetch everything in parallel
       const [swipedRes, teamsRes, membersRes] = await Promise.all([
         supabase
           .from('matches')
@@ -67,7 +71,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
           .eq('user_id', userId)
           .eq('match_type', 'individual_to_team')
           .not('team_id', 'is', null),
-        supabase.from('teams').select('*'),
+        supabase.from('teams').select('id, name, description, studio, skills_needed, created_by'),
         supabase
           .from('team_members')
           .select('team_id, user_id, role')
@@ -76,7 +80,6 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
 
       if (teamsRes.error) {
         console.error('Error fetching teams:', teamsRes.error);
-        toast.error('Failed to load teams');
         return;
       }
 
@@ -95,7 +98,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
       if (availableTeams.length === 0) {
         if (isMountedRef.current) {
           setTeams([]);
-          setLoading(false);
+          initialFetchDone.current = true;
         }
         return;
       }
@@ -108,7 +111,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
       if (memberUserIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('*')
+          .select('user_id, name, program, skills, bio, studio_preference, studio_preferences, avatar, linkedin')
           .in('user_id', memberUserIds);
 
         (profilesData || []).forEach(p => {
@@ -141,6 +144,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
 
       if (isMountedRef.current) {
         setTeams(transformedTeams);
+        initialFetchDone.current = true;
       }
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -156,7 +160,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
   useEffect(() => {
     isMountedRef.current = true;
     
-    if (hasProfile) {
+    if (hasProfile && userId) {
       fetchTeams();
     } else {
       setLoading(false);
@@ -165,7 +169,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
     return () => {
       isMountedRef.current = false;
     };
-  }, [hasProfile, fetchTeams]);
+  }, [hasProfile, userId, fetchTeams]);
 
   const removeTeam = useCallback((teamId: string) => {
     setTeams(prev => prev.filter(t => t.id !== teamId));

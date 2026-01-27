@@ -63,7 +63,7 @@ const Index = () => {
   // ============================================================================
   // AUTH & NAVIGATION
   // ============================================================================
-  const { user, profile, loading, refreshProfile, signOut } = useAuth();
+  const { user, profile, loading, profileLoading, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
 
   // ============================================================================
@@ -98,8 +98,11 @@ const Index = () => {
     teamSize: null,
   });
 
+  // Determine if we have a profile (for conditional hook execution)
+  const hasProfile = !!profile;
+
   // ============================================================================
-  // DATA HOOKS
+  // DATA HOOKS - Only fetch when profile exists
   // ============================================================================
   
   /** Profiles available for swiping */
@@ -109,7 +112,7 @@ const Index = () => {
     removeProfile, 
     addProfile,
     refresh: refreshProfiles 
-  } = useProfiles(user?.id, !!profile);
+  } = useProfiles(user?.id, hasProfile);
 
   /** Teams available for swiping */
   const { 
@@ -117,22 +120,25 @@ const Index = () => {
     loading: loadingTeams, 
     removeTeam, 
     addTeam 
-  } = useTeams(user?.id, !!profile);
+  } = useTeams(user?.id, hasProfile);
 
-  /** Unread message count for notification badge */
-  const unreadCount = useUnreadCount(user?.id);
+  /** Unread message count for notification badge - deferred */
+  const unreadCount = useUnreadCount(hasProfile ? user?.id : undefined);
 
   /** Current user's team membership */
-  const { myTeam, setMyTeam, createTeam, refreshTeam } = useMyTeam(user?.id, profile);
+  const { myTeam, setMyTeam, createTeam, refreshTeam } = useMyTeam(
+    hasProfile ? user?.id : undefined, 
+    profile
+  );
 
-  /** Swipe activity history */
+  /** Swipe activity history - deferred, not critical for initial render */
   const { 
     history, 
     loading: loadingHistory,
     addToHistory, 
     removeFromHistory, 
     removeLastFromHistory 
-  } = useActivityHistory(user?.id, !!profile);
+  } = useActivityHistory(hasProfile ? user?.id : undefined, hasProfile);
 
   // ============================================================================
   // MATCHING HOOKS
@@ -356,7 +362,7 @@ const Index = () => {
   // LOADING & AUTH STATES
   // ============================================================================
 
-  // Only block on initial auth loading, not data fetching
+  // Only block on initial auth check - profile can load in background
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -369,13 +375,26 @@ const Index = () => {
     return null;
   }
   
-  // Track if data is still loading (for showing skeleton states)
-  const isDataLoading = profile && (loadingProfiles || loadingTeams);
-
+  // Show onboarding if profile is loaded and doesn't exist
+  // But if profile is still loading, show a brief loading state
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-muted-foreground text-sm">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+  
   // Show onboarding if no profile exists
   if (!profile) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
+  
+  // Track if data is still loading (for showing skeleton states)
+  const isDataLoading = loadingProfiles || loadingTeams;
 
   // ============================================================================
   // RENDER HELPERS

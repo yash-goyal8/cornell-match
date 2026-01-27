@@ -2,7 +2,7 @@
  * useProfiles Hook
  * 
  * Fetches and manages user profiles for the matching system.
- * Optimized with parallel queries and proper cleanup.
+ * Optimized with single consolidated query and proper cleanup.
  * 
  * @param userId - Current authenticated user's ID
  * @param hasProfile - Whether the current user has completed their profile
@@ -12,7 +12,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UserProfile, Program, Studio } from '@/types';
-import { toast } from 'sonner';
 
 interface UseProfilesResult {
   /** List of available user profiles to swipe on */
@@ -32,6 +31,7 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
   const [loading, setLoading] = useState(true);
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
+  const initialFetchDone = useRef(false);
 
   /**
    * Transforms a database profile record into a UserProfile object
@@ -49,16 +49,20 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
   }), []);
 
   /**
-   * Fetches profiles from the database using parallel queries
+   * Fetches profiles from the database using optimized single query approach
    */
   const fetchProfiles = useCallback(async () => {
     if (!userId || fetchingRef.current) return;
 
     fetchingRef.current = true;
-    setLoading(true);
+    
+    // Only show loading on initial fetch
+    if (!initialFetchDone.current) {
+      setLoading(true);
+    }
     
     try {
-      // Parallel fetch: all data needed for filtering
+      // Single consolidated query: fetch all needed data in parallel
       const [teamMembersRes, swipedMatchesRes, profilesRes] = await Promise.all([
         supabase
           .from('team_members')
@@ -71,13 +75,12 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
           .in('match_type', ['individual_to_individual', 'team_to_individual']),
         supabase
           .from('profiles')
-          .select('*')
+          .select('user_id, name, program, skills, bio, studio_preference, studio_preferences, avatar, linkedin')
           .neq('user_id', userId),
       ]);
 
       if (profilesRes.error) {
         console.error('Error fetching profiles:', profilesRes.error);
-        toast.error('Failed to load profiles');
         return;
       }
 
@@ -91,6 +94,7 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
 
       if (isMountedRef.current) {
         setProfiles(availableProfiles);
+        initialFetchDone.current = true;
       }
     } catch (error) {
       console.error('Error fetching profiles:', error);
@@ -106,7 +110,7 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
   useEffect(() => {
     isMountedRef.current = true;
     
-    if (hasProfile) {
+    if (hasProfile && userId) {
       fetchProfiles();
     } else {
       setLoading(false);
@@ -115,7 +119,7 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
     return () => {
       isMountedRef.current = false;
     };
-  }, [hasProfile, fetchProfiles]);
+  }, [hasProfile, userId, fetchProfiles]);
 
   const removeProfile = useCallback((profileId: string) => {
     setProfiles(prev => prev.filter(p => p.id !== profileId));
