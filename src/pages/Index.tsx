@@ -32,6 +32,7 @@ import { FilterPanel, PeopleFilters, TeamFilters } from '@/components/FilterPane
 import { PrivacySettingsModal } from '@/components/PrivacySettingsModal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { SwipeStackSkeleton } from '@/components/ui/skeleton-card';
 
 // Hooks
 import { useAuth } from '@/contexts/AuthContext';
@@ -355,7 +356,8 @@ const Index = () => {
   // LOADING & AUTH STATES
   // ============================================================================
 
-  if (loading || (profile && (loadingProfiles || loadingTeams))) {
+  // Only block on initial auth loading, not data fetching
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -366,6 +368,9 @@ const Index = () => {
   if (!user) {
     return null;
   }
+  
+  // Track if data is still loading (for showing skeleton states)
+  const isDataLoading = profile && (loadingProfiles || loadingTeams);
 
   // Show onboarding if no profile exists
   if (!profile) {
@@ -497,59 +502,63 @@ const Index = () => {
         {/* Cards Stack */}
         <div className="relative flex items-start justify-center pb-8">
           <div className="relative w-full max-w-sm h-[420px] sm:h-[460px]">
-            <AnimatePresence mode="popLayout">
-              {activeTab === 'individuals' ? (
-                hasCards ? (
-                  filteredUsers.slice(0, 2).map((user, index) => (
-                    <SwipeableCard
-                      key={user.id}
-                      profile={user}
-                      onSwipe={handleUserSwipe}
-                      onTap={() => handleProfileTap(user)}
+            {isDataLoading ? (
+              <SwipeStackSkeleton />
+            ) : (
+              <AnimatePresence mode="popLayout">
+                {activeTab === 'individuals' ? (
+                  hasCards ? (
+                    filteredUsers.slice(0, 2).map((user, index) => (
+                      <SwipeableCard
+                        key={user.id}
+                        profile={user}
+                        onSwipe={handleUserSwipe}
+                        onTap={() => handleProfileTap(user)}
+                        isTop={index === 0}
+                      />
+                    ))
+                  ) : (
+                    <motion.div
+                      key="empty-users"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-center py-12"
+                    >
+                      <p className="text-muted-foreground mb-4">
+                        {profiles.length > 0 ? 'No matches for current filters' : "You've seen everyone!"}
+                      </p>
+                      {canUndo && (
+                        <p className="text-sm text-muted-foreground">Use the undo button to go back through profiles</p>
+                      )}
+                    </motion.div>
+                  )
+                ) : hasCards ? (
+                  filteredTeams.slice(0, 2).map((team, index) => (
+                    <SwipeableTeamCard
+                      key={team.id}
+                      team={team}
+                      onSwipe={handleTeamSwipe}
+                      onTap={() => handleTeamTap(team)}
                       isTop={index === 0}
                     />
                   ))
                 ) : (
                   <motion.div
-                    key="empty-users"
+                    key="empty-teams"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center py-12"
                   >
                     <p className="text-muted-foreground mb-4">
-                      {profiles.length > 0 ? 'No matches for current filters' : "You've seen everyone!"}
+                      {teams.length > 0 ? 'No matches for current filters' : "You've seen all teams!"}
                     </p>
                     {canUndo && (
-                      <p className="text-sm text-muted-foreground">Use the undo button to go back through profiles</p>
+                      <p className="text-sm text-muted-foreground">Use the undo button to go back through teams</p>
                     )}
                   </motion.div>
-                )
-              ) : hasCards ? (
-                filteredTeams.slice(0, 2).map((team, index) => (
-                  <SwipeableTeamCard
-                    key={team.id}
-                    team={team}
-                    onSwipe={handleTeamSwipe}
-                    onTap={() => handleTeamTap(team)}
-                    isTop={index === 0}
-                  />
-                ))
-              ) : (
-                <motion.div
-                  key="empty-teams"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-center py-12"
-                >
-                  <p className="text-muted-foreground mb-4">
-                    {teams.length > 0 ? 'No matches for current filters' : "You've seen all teams!"}
-                  </p>
-                  {canUndo && (
-                    <p className="text-sm text-muted-foreground">Use the undo button to go back through teams</p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+              </AnimatePresence>
+            )}
           </div>
         </div>
 
