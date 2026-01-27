@@ -11,7 +11,7 @@
  * @module pages/Index
  */
 
-import { useState, useCallback, useEffect, useMemo, forwardRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, History } from 'lucide-react';
@@ -58,7 +58,7 @@ import { profileSchema, validateInput } from '@/lib/validation';
  * - Filtering and activity history
  * - Team creation and management
  */
-const Index = forwardRef<HTMLDivElement>((_, ref) => {
+const Index = () => {
   // ============================================================================
   // AUTH & NAVIGATION
   // ============================================================================
@@ -395,7 +395,7 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
   // ============================================================================
 
   return (
-    <div ref={ref} className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -654,8 +654,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
       />
     </div>
   );
-});
-
-Index.displayName = 'Index';
+};
 
 export default Index;
