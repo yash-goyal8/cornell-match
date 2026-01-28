@@ -91,85 +91,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     isMountedRef.current = true;
     
-    // CRITICAL: Set a timeout to ensure loading never stays stuck
-    const loadingTimeout = setTimeout(() => {
-      if (isMountedRef.current && loading) {
-        console.warn('Auth loading timeout - forcing completion');
-        setLoading(false);
-      }
-    }, 5000); // 5 second max wait
+    // CRITICAL: Separate initial load from ongoing auth changes (Stack Overflow pattern)
     
-    // CRITICAL: Set a timeout for profile loading too
-    const profileLoadingTimeout = setTimeout(() => {
-      if (isMountedRef.current && profileLoadingRef.current) {
-        console.warn('Profile loading timeout - forcing completion');
-        profileLoadingRef.current = false;
-        setProfileLoading(false);
-      }
-    }, 5000); // 5 second max wait for profile
-
-    const initSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (!isMountedRef.current) return;
-        
-        if (error) {
-          console.error('Session error:', error);
-          setLoading(false);
-          profileLoadingRef.current = false;
-          setProfileLoading(false);
-          return;
-        }
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-        
-        // Fetch profile in background
-        if (session?.user) {
-          profileLoadingRef.current = true;
-          setProfileLoading(true);
-          const profileData = await fetchProfile(session.user.id);
-          if (isMountedRef.current) {
-            setProfile(profileData);
-            profileLoadingRef.current = false;
-            setProfileLoading(false);
-          }
-        } else {
-          profileLoadingRef.current = false;
-          setProfileLoading(false);
-        }
-      } catch (error) {
-        console.error('Error initializing session:', error);
-        if (isMountedRef.current) {
-          setLoading(false);
-          profileLoadingRef.current = false;
-          setProfileLoading(false);
-        }
-      }
-    };
-
-    initSession();
-
-    // Set up auth state listener
+    // 1. Listener for ONGOING auth changes (does NOT control initial loading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMountedRef.current) return;
         
+        console.log('Auth state change:', event);
+        
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false); // Always ensure loading is false on auth change
         
+        // Fire and forget for ongoing changes - don't block loading
         if (session?.user) {
           profileLoadingRef.current = true;
           setProfileLoading(true);
-          const profileData = await fetchProfile(session.user.id);
-          if (isMountedRef.current) {
-            setProfile(profileData);
-            profileLoadingRef.current = false;
-            setProfileLoading(false);
-          }
+          fetchProfile(session.user.id).then(profileData => {
+            if (isMountedRef.current) {
+              setProfile(profileData);
+              profileLoadingRef.current = false;
+              setProfileLoading(false);
+            }
+          });
         } else {
           setProfile(null);
           profileLoadingRef.current = false;
@@ -178,10 +122,46 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     );
 
+    // 2. INITIAL load (controls isLoading) - must await all operations
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (!isMountedRef.current) return;
+        
+        if (error) {
+          console.error('Session error:', error);
+          return;
+        }
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Fetch profile BEFORE setting loading false
+        if (session?.user) {
+          profileLoadingRef.current = true;
+          setProfileLoading(true);
+          const profileData = await fetchProfile(session.user.id);
+          if (isMountedRef.current) {
+            setProfile(profileData);
+            profileLoadingRef.current = false;
+            setProfileLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        // ALWAYS set loading false after initialization
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
     return () => {
       isMountedRef.current = false;
-      clearTimeout(loadingTimeout);
-      clearTimeout(profileLoadingTimeout);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);

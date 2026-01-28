@@ -1,37 +1,28 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Loader2, Users, ArrowLeft, Shield } from 'lucide-react';
-import { validatePasswordStrength, logSecurityEvent } from '@/lib/security';
+import { Loader2, Users, ArrowLeft } from 'lucide-react';
+import { validatePasswordStrength } from '@/lib/security';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { user, profile, loading, profileLoading } = useAuth();
+  
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'update-password'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  
-  // Use ref to track recovery mode to avoid stale closure issues
-  const isRecoveryModeRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
+  // Check for recovery token in URL on mount
   useEffect(() => {
-    // Safety timeout - never stay stuck on loading
-    const timeout = setTimeout(() => {
-      if (checkingAuth) {
-        console.warn('Auth check timeout - forcing completion');
-        setCheckingAuth(false);
-      }
-    }, 3000);
-
-    // Check for recovery token in URL hash or query params
     const hash = window.location.hash;
     const searchParams = new URLSearchParams(window.location.search);
     const isRecoveryFlow = 
@@ -39,87 +30,37 @@ const Auth = () => {
       searchParams.get('reset') === 'true';
     
     if (isRecoveryFlow) {
-      isRecoveryModeRef.current = true;
-      setCheckingAuth(false);
-      return () => clearTimeout(timeout);
+      setMode('update-password');
     }
+  }, []);
 
-    // Check if already logged in
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Session check error:', error);
-          setCheckingAuth(false);
-          return;
-        }
-        
-        if (session && !isRecoveryModeRef.current) {
-          // Check if user has profile
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          
-          if (profile) {
-            navigate('/app', { replace: true });
-          } else {
-            navigate('/onboarding', { replace: true });
-          }
-        }
-      } catch (err) {
-        console.error('Session check failed:', err);
-      } finally {
-        setCheckingAuth(false);
-      }
-    };
-
-    checkSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event);
-      
+  // Handle PASSWORD_RECOVERY event
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        isRecoveryModeRef.current = true;
         setMode('update-password');
-        setCheckingAuth(false);
-        return;
-      }
-      
-      if (isRecoveryModeRef.current) {
-        return;
-      }
-      
-      if (event === 'SIGNED_IN' && session) {
-        try {
-          // Check if user has profile to decide where to go
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          
-          if (profile) {
-            navigate('/app', { replace: true });
-          } else {
-            navigate('/onboarding', { replace: true });
-          }
-        } catch (err) {
-          console.error('Profile check failed:', err);
-          // Default to onboarding if we can't check
-          navigate('/onboarding', { replace: true });
-        }
       }
     });
+    return () => subscription.unsubscribe();
+  }, []);
 
-    return () => {
-      clearTimeout(timeout);
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
+  // Redirect when authenticated (let AuthContext handle state)
+  useEffect(() => {
+    // Don't redirect during password update flow
+    if (mode === 'update-password') return;
+    
+    // Wait for auth to finish loading
+    if (loading || profileLoading) return;
+    
+    // If user is authenticated, redirect based on profile status
+    if (user) {
+      if (profile) {
+        navigate('/app', { replace: true });
+      } else {
+        navigate('/onboarding', { replace: true });
+      }
+    }
+  }, [user, profile, loading, profileLoading, mode, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +71,6 @@ const Auth = () => {
         return;
       }
       
-      // Validate password strength
       const strength = validatePasswordStrength(password);
       if (!strength.isValid) {
         toast.error(strength.feedback[0] || 'Password does not meet requirements');
@@ -142,27 +82,20 @@ const Auth = () => {
         return;
       }
       
-      setLoading(true);
+      setSubmitting(true);
       try {
         const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
         
-        // Log the password change
-        await logSecurityEvent('password_changed');
-        
-        // Clear recovery mode and sign out to force fresh login with new password
-        isRecoveryModeRef.current = false;
         await supabase.auth.signOut();
-        
-        toast.success('Password updated successfully! Please log in with your new password.');
+        toast.success('Password updated! Please log in with your new password.');
         setMode('login');
         setPassword('');
         setConfirmPassword('');
       } catch (error: any) {
-        console.error('Password update error:', error);
         toast.error(error.message || 'Failed to update password');
       } finally {
-        setLoading(false);
+        setSubmitting(false);
       }
       return;
     }
@@ -177,7 +110,6 @@ const Auth = () => {
       return;
     }
 
-    // For signup, validate password strength
     if (mode === 'signup') {
       const strength = validatePasswordStrength(password);
       if (!strength.isValid) {
@@ -189,7 +121,7 @@ const Auth = () => {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
 
     try {
       if (mode === 'forgot') {
@@ -200,25 +132,21 @@ const Auth = () => {
         toast.success('Password reset email sent! Check your inbox.');
         setMode('login');
       } else if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success('Welcome back!');
+        // Navigation handled by useEffect above
       } else {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          },
+          options: { emailRedirectTo: `${window.location.origin}/` },
         });
         if (error) throw error;
         toast.success('Account created! You can now log in.');
+        // Navigation handled by useEffect above
       }
     } catch (error: any) {
-      console.error('Auth error:', error);
       if (error.message.includes('Invalid login credentials')) {
         toast.error('Invalid email or password');
       } else if (error.message.includes('User already registered')) {
@@ -227,13 +155,12 @@ const Auth = () => {
         toast.error(error.message || 'Authentication failed');
       }
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Remove the second useEffect - logic is now consolidated above
-
-  if (checkingAuth) {
+  // Show loading only during initial auth check, not during form submission
+  if (loading && !submitting) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -316,7 +243,7 @@ const Auth = () => {
                   placeholder="you@cornell.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
+                  disabled={submitting}
                 />
               </div>
             )}
@@ -330,7 +257,7 @@ const Auth = () => {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={submitting}
                 />
                 {(mode === 'signup' || mode === 'update-password') && (
                   <PasswordStrengthMeter password={password} />
@@ -347,7 +274,7 @@ const Auth = () => {
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={loading}
+                  disabled={submitting}
                 />
               </div>
             )}
@@ -358,21 +285,15 @@ const Auth = () => {
                   type="button"
                   onClick={() => setMode('forgot')}
                   className="text-sm text-primary hover:underline"
-                  disabled={loading}
+                  disabled={submitting}
                 >
                   Forgot password?
                 </button>
               </div>
             )}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               {getButtonText()}
             </Button>
           </form>
@@ -383,7 +304,7 @@ const Auth = () => {
                 type="button"
                 onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                disabled={loading}
+                disabled={submitting}
               >
                 {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
                 <span className="text-primary font-medium">
@@ -393,7 +314,6 @@ const Auth = () => {
             </div>
           )}
         </div>
-
       </motion.div>
     </div>
   );
