@@ -23,6 +23,14 @@ const Auth = () => {
   const isRecoveryModeRef = useRef(false);
 
   useEffect(() => {
+    // Safety timeout - never stay stuck on loading
+    const timeout = setTimeout(() => {
+      if (checkingAuth) {
+        console.warn('Auth check timeout - forcing completion');
+        setCheckingAuth(false);
+      }
+    }, 3000);
+
     // Check for recovery token in URL hash or query params
     const hash = window.location.hash;
     const searchParams = new URLSearchParams(window.location.search);
@@ -33,9 +41,20 @@ const Auth = () => {
     if (isRecoveryFlow) {
       isRecoveryModeRef.current = true;
       setCheckingAuth(false);
-    } else {
-      // Check if already logged in
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
+      return () => clearTimeout(timeout);
+    }
+
+    // Check if already logged in
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session check error:', error);
+          setCheckingAuth(false);
+          return;
+        }
+        
         if (session && !isRecoveryModeRef.current) {
           // Check if user has profile
           const { data: profile } = await supabase
@@ -50,9 +69,14 @@ const Auth = () => {
             navigate('/onboarding', { replace: true });
           }
         }
+      } catch (err) {
+        console.error('Session check failed:', err);
+      } finally {
         setCheckingAuth(false);
-      });
-    }
+      }
+    };
+
+    checkSession();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -70,22 +94,31 @@ const Auth = () => {
       }
       
       if (event === 'SIGNED_IN' && session) {
-        // Check if user has profile to decide where to go
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        
-        if (profile) {
-          navigate('/app', { replace: true });
-        } else {
+        try {
+          // Check if user has profile to decide where to go
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (profile) {
+            navigate('/app', { replace: true });
+          } else {
+            navigate('/onboarding', { replace: true });
+          }
+        } catch (err) {
+          console.error('Profile check failed:', err);
+          // Default to onboarding if we can't check
           navigate('/onboarding', { replace: true });
         }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
