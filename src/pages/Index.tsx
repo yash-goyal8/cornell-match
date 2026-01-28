@@ -63,7 +63,7 @@ const Index = () => {
   // ============================================================================
   // AUTH & NAVIGATION
   // ============================================================================
-  const { user, profile, loading, profileLoading, refreshProfile, signOut } = useAuth();
+  const { user, session, profile, loading, profileLoading, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
 
   // ============================================================================
@@ -189,10 +189,10 @@ const Index = () => {
   // ============================================================================
   
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && (!user || !session)) {
       navigate('/auth');
     }
-  }, [user, loading, navigate]);
+  }, [user, session, loading, navigate]);
 
   // ============================================================================
   // PROFILE HANDLERS
@@ -382,12 +382,14 @@ const Index = () => {
     );
   }
 
-  // Redirect to auth if no user (useEffect handles the redirect)
-  if (!user) {
-    return null; // Return null - useEffect will redirect
+  // CRITICAL: If no user OR no session, redirect to auth page
+  // This ensures unauthenticated users ALWAYS see the login page first
+  if (!user || !session) {
+    // useEffect handles the actual redirect, but return null to prevent flash
+    return null;
   }
   
-  // Show loading while profile is being fetched
+  // Show loading while profile is being fetched (only for authenticated users)
   if (profileLoading && !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -399,7 +401,7 @@ const Index = () => {
     );
   }
   
-  // Show onboarding only if user exists, profile loading is done, and no profile
+  // Show onboarding only for authenticated users without a profile
   if (!profile) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
