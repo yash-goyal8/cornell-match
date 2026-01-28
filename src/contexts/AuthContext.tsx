@@ -44,18 +44,34 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
-      const { data, error } = await supabase
+      // Create a promise race with timeout
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
+
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 5000);
+      });
+
+      const result = await Promise.race([profilePromise, timeoutPromise]);
+      
+      // Timeout hit
+      if (result === null) {
+        console.warn('Profile fetch timed out');
+        return null;
+      }
+
+      const { data, error } = result;
 
       if (error) {
         console.error('Error fetching profile:', error);
         return null;
       }
 
-      if (data) {
+      // Only return profile if it's been completed (not auto-created placeholder)
+      if (data && data.name && data.name !== 'Undeclared') {
         return {
           id: data.id,
           name: data.name,
