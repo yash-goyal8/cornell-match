@@ -362,14 +362,28 @@ const Index = () => {
   // LOADING & AUTH STATES
   // ============================================================================
 
-  // Show loading skeleton during auth check
+  // Show loading spinner during auth check - using inline styles for guaranteed visibility
   if (loading) {
-    return <PageSkeleton />;
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto" style={{ color: '#ef4444' }} />
+          <p className="mt-4 text-lg" style={{ color: '#ffffff' }}>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   // Redirect to auth if no user (after loading completes)
   if (!user) {
-    return <PageSkeleton />; // Show skeleton while redirecting
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto" style={{ color: '#ef4444' }} />
+          <p className="mt-4 text-lg" style={{ color: '#ffffff' }}>Redirecting...</p>
+        </div>
+      </div>
+    );
   }
   
   // Show onboarding if no profile exists (profileLoading=false means we checked)
@@ -377,11 +391,14 @@ const Index = () => {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
   
-  // If profile is still loading or doesn't exist yet, show skeleton
+  // If profile is still loading or doesn't exist yet, show loading
   if (!profile) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <SwipeStackSkeleton />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto" style={{ color: '#ef4444' }} />
+          <p className="mt-4 text-lg" style={{ color: '#ffffff' }}>Loading profile...</p>
+        </div>
       </div>
     );
   }
