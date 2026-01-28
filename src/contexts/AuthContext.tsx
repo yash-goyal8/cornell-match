@@ -44,18 +44,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
-      // Use Promise.race for timeout
-      const profilePromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
-
-      const timeoutPromise = new Promise<{ data: null; error: Error }>((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
-      );
-
-      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
 
       if (error) {
         console.error('Error fetching profile:', error);
@@ -77,7 +70,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
       return null;
     } catch (error: any) {
-      console.warn('Profile fetch failed or timed out:', error.message);
+      console.error('Profile fetch error:', error.message);
       return null;
     }
   }, []);
