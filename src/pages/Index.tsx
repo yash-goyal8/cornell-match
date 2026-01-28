@@ -11,7 +11,7 @@
  * @module pages/Index
  */
 
-import { useState, useCallback, useEffect, useMemo, forwardRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, History } from 'lucide-react';
@@ -59,7 +59,7 @@ import { profileSchema, validateInput } from '@/lib/validation';
  * - Filtering and activity history
  * - Team creation and management
  */
-const Index = forwardRef<HTMLDivElement>((_, ref) => {
+const Index = () => {
   // ============================================================================
   // AUTH & NAVIGATION
   // ============================================================================
@@ -376,9 +376,17 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
   
-  // Track if data is still loading (for showing skeleton states)
-  // Include profileLoading to show skeleton while profile is being fetched
-  const isDataLoading = profileLoading || loadingProfiles || loadingTeams;
+  // If profile is still loading or doesn't exist yet, show skeleton
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <SwipeStackSkeleton />
+      </div>
+    );
+  }
+  
+  // Track if data is still loading (for showing skeleton states in card area)
+  const isDataLoading = loadingProfiles || loadingTeams;
 
   // ============================================================================
   // RENDER HELPERS
@@ -666,8 +674,6 @@ const Index = forwardRef<HTMLDivElement>((_, ref) => {
       />
     </div>
   );
-});
-
-Index.displayName = 'Index';
+};
 
 export default Index;
