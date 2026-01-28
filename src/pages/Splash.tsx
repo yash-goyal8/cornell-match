@@ -6,11 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const Splash = () => {
   const navigate = useNavigate();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileLoading } = useAuth();
   const [countdown, setCountdown] = useState(3);
+  const [hasNavigated, setHasNavigated] = useState(false);
 
+  // Countdown timer
   useEffect(() => {
-    // Countdown timer
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -24,21 +25,38 @@ const Splash = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Navigation logic - ONLY after countdown AND all loading is complete
   useEffect(() => {
-    // After countdown finishes AND auth is loaded, navigate
-    if (countdown === 0 && !loading) {
-      if (user && profile) {
-        // Logged in with profile → main app
-        navigate('/app', { replace: true });
-      } else if (user && !profile) {
-        // Logged in without profile → onboarding
-        navigate('/onboarding', { replace: true });
-      } else {
-        // Not logged in → auth page
-        navigate('/auth', { replace: true });
-      }
+    // Don't navigate if already navigated
+    if (hasNavigated) return;
+    
+    // Wait for countdown to finish
+    if (countdown > 0) return;
+    
+    // Wait for auth loading to complete
+    if (loading) return;
+    
+    // If no user, go to auth immediately
+    if (!user) {
+      setHasNavigated(true);
+      navigate('/auth', { replace: true });
+      return;
     }
-  }, [countdown, loading, user, profile, navigate]);
+    
+    // User exists - wait for profile loading to complete before deciding
+    if (profileLoading) return;
+    
+    // Now we know: loading is done, profileLoading is done
+    setHasNavigated(true);
+    
+    if (profile) {
+      // Has profile → main app
+      navigate('/app', { replace: true });
+    } else {
+      // No profile → onboarding
+      navigate('/onboarding', { replace: true });
+    }
+  }, [countdown, loading, profileLoading, user, profile, navigate, hasNavigated]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
