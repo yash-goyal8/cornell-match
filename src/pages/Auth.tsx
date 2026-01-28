@@ -44,38 +44,14 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Redirect when authenticated (let AuthContext handle state)
+  // Redirect when authenticated
   useEffect(() => {
-    // Don't redirect during password update flow
     if (mode === 'update-password') return;
+    if (loading || !user) return;
+    if (profileLoading) return;
     
-    console.log('Auth redirect check:', { loading, user: !!user, profileLoading, profile: !!profile });
-    
-    // Wait for auth AND profile loading to complete
-    if (loading) {
-      console.log('Still loading auth...');
-      return;
-    }
-    
-    // No user = stay on auth page
-    if (!user) {
-      console.log('No user, staying on auth');
-      return;
-    }
-    
-    // User exists - wait for profile loading to finish
-    if (profileLoading) {
-      console.log('Profile still loading...');
-      return;
-    }
-    
-    // Now we know: user exists, profile loading is done
-    console.log('Redirecting...', profile ? '/app' : '/onboarding');
-    if (profile) {
-      navigate('/app', { replace: true });
-    } else {
-      navigate('/onboarding', { replace: true });
-    }
+    // User logged in with profile -> app, without profile -> onboarding
+    navigate(profile ? '/app' : '/onboarding', { replace: true });
   }, [user, profile, loading, profileLoading, mode, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,11 +123,12 @@ const Auth = () => {
         if (error) throw error;
         toast.success('Password reset email sent! Check your inbox.');
         setMode('login');
+        setSubmitting(false);
       } else if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success('Welcome back!');
-        // Don't wait here - redirect will happen via useEffect when profile loads
+        // Redirect happens via useEffect - keep submitting true until redirect
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -159,8 +136,8 @@ const Auth = () => {
           options: { emailRedirectTo: `${window.location.origin}/` },
         });
         if (error) throw error;
-        toast.success('Account created! You can now log in.');
-        // Don't wait here - redirect will happen via useEffect
+        toast.success('Account created!');
+        // Redirect happens via useEffect - keep submitting true until redirect
       }
     } catch (error: any) {
       if (error.message.includes('Invalid login credentials')) {
@@ -170,14 +147,8 @@ const Auth = () => {
       } else {
         toast.error(error.message || 'Authentication failed');
       }
-      // Only reset submitting on error - on success, let the redirect handle cleanup
       setSubmitting(false);
-      return;
     }
-    
-    // Reset submitting after a short delay to show success state briefly
-    // The redirect will happen automatically via useEffect
-    setTimeout(() => setSubmitting(false), 500);
   };
 
   // Show loading only during initial auth check, not during form submission or profile loading
