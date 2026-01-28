@@ -32,7 +32,7 @@ import { FilterPanel, PeopleFilters, TeamFilters } from '@/components/FilterPane
 import { PrivacySettingsModal } from '@/components/PrivacySettingsModal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { SwipeStackSkeleton } from '@/components/ui/skeleton-card';
+import { SwipeStackSkeleton, PageSkeleton } from '@/components/ui/skeleton-card';
 
 // Hooks
 import { useAuth } from '@/contexts/AuthContext';
@@ -362,13 +362,14 @@ const Index = () => {
   // LOADING & AUTH STATES
   // ============================================================================
 
-  // Only block on initial auth check
+  // Show loading skeleton during auth check
   if (loading) {
-    return null; // App.tsx Suspense shows PageSkeleton
+    return <PageSkeleton />;
   }
 
+  // Redirect to auth if no user (after loading completes)
   if (!user) {
-    return null;
+    return <PageSkeleton />; // Show skeleton while redirecting
   }
   
   // Show onboarding if no profile exists (profileLoading=false means we checked)
