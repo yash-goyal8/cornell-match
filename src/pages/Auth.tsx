@@ -49,16 +49,20 @@ const Auth = () => {
     // Don't redirect during password update flow
     if (mode === 'update-password') return;
     
-    // Wait for auth to finish loading
-    if (loading || profileLoading) return;
+    // Wait for auth AND profile loading to complete
+    if (loading) return;
     
-    // If user is authenticated, redirect based on profile status
-    if (user) {
-      if (profile) {
-        navigate('/app', { replace: true });
-      } else {
-        navigate('/onboarding', { replace: true });
-      }
+    // No user = stay on auth page
+    if (!user) return;
+    
+    // User exists - wait for profile loading to finish
+    if (profileLoading) return;
+    
+    // Now we know: user exists, profile loading is done
+    if (profile) {
+      navigate('/app', { replace: true });
+    } else {
+      navigate('/onboarding', { replace: true });
     }
   }, [user, profile, loading, profileLoading, mode, navigate]);
 
