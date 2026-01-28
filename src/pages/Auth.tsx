@@ -128,7 +128,8 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success('Welcome back!');
-        // Redirect happens via useEffect - keep submitting true until redirect
+        // Set a max timeout to prevent stuck state - redirect should happen faster
+        setTimeout(() => setSubmitting(false), 8000);
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -136,8 +137,12 @@ const Auth = () => {
           options: { emailRedirectTo: `${window.location.origin}/` },
         });
         if (error) throw error;
-        toast.success('Account created!');
-        // Redirect happens via useEffect - keep submitting true until redirect
+        toast.success('Account created! Redirecting...');
+        // For signup, redirect to onboarding immediately (trigger created placeholder profile)
+        setTimeout(() => {
+          setSubmitting(false);
+          navigate('/onboarding', { replace: true });
+        }, 500);
       }
     } catch (error: any) {
       if (error.message.includes('Invalid login credentials')) {
