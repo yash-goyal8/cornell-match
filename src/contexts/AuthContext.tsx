@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const isMountedRef = useRef(true);
+  const profileLoadingRef = useRef(false); // Track profileLoading for timeout
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
@@ -76,10 +77,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const refreshProfile = useCallback(async () => {
     if (user && isMountedRef.current) {
+      profileLoadingRef.current = true;
       setProfileLoading(true);
       const fetchedProfile = await fetchProfile(user.id);
       if (isMountedRef.current) {
         setProfile(fetchedProfile);
+        profileLoadingRef.current = false;
         setProfileLoading(false);
       }
     }
@@ -95,6 +98,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setLoading(false);
       }
     }, 5000); // 5 second max wait
+    
+    // CRITICAL: Set a timeout for profile loading too
+    const profileLoadingTimeout = setTimeout(() => {
+      if (isMountedRef.current && profileLoadingRef.current) {
+        console.warn('Profile loading timeout - forcing completion');
+        profileLoadingRef.current = false;
+        setProfileLoading(false);
+      }
+    }, 5000); // 5 second max wait for profile
 
     const initSession = async () => {
       try {
@@ -105,6 +117,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (error) {
           console.error('Session error:', error);
           setLoading(false);
+          profileLoadingRef.current = false;
+          setProfileLoading(false);
           return;
         }
         
@@ -114,17 +128,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         // Fetch profile in background
         if (session?.user) {
+          profileLoadingRef.current = true;
           setProfileLoading(true);
           const profileData = await fetchProfile(session.user.id);
           if (isMountedRef.current) {
             setProfile(profileData);
+            profileLoadingRef.current = false;
             setProfileLoading(false);
           }
+        } else {
+          profileLoadingRef.current = false;
+          setProfileLoading(false);
         }
       } catch (error) {
         console.error('Error initializing session:', error);
         if (isMountedRef.current) {
           setLoading(false);
+          profileLoadingRef.current = false;
+          setProfileLoading(false);
         }
       }
     };
@@ -141,14 +162,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setLoading(false); // Always ensure loading is false on auth change
         
         if (session?.user) {
+          profileLoadingRef.current = true;
           setProfileLoading(true);
           const profileData = await fetchProfile(session.user.id);
           if (isMountedRef.current) {
             setProfile(profileData);
+            profileLoadingRef.current = false;
             setProfileLoading(false);
           }
         } else {
           setProfile(null);
+          profileLoadingRef.current = false;
+          setProfileLoading(false);
         }
       }
     );
@@ -156,6 +181,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => {
       isMountedRef.current = false;
       clearTimeout(loadingTimeout);
+      clearTimeout(profileLoadingTimeout);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
