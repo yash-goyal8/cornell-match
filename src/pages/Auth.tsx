@@ -151,7 +151,7 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success('Welcome back!');
-        // Navigation handled by useEffect above
+        // Don't wait here - redirect will happen via useEffect when profile loads
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -160,7 +160,7 @@ const Auth = () => {
         });
         if (error) throw error;
         toast.success('Account created! You can now log in.');
-        // Navigation handled by useEffect above
+        // Don't wait here - redirect will happen via useEffect
       }
     } catch (error: any) {
       if (error.message.includes('Invalid login credentials')) {
@@ -170,9 +170,14 @@ const Auth = () => {
       } else {
         toast.error(error.message || 'Authentication failed');
       }
-    } finally {
+      // Only reset submitting on error - on success, let the redirect handle cleanup
       setSubmitting(false);
+      return;
     }
+    
+    // Reset submitting after a short delay to show success state briefly
+    // The redirect will happen automatically via useEffect
+    setTimeout(() => setSubmitting(false), 500);
   };
 
   // Show loading only during initial auth check, not during form submission or profile loading
