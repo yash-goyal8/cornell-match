@@ -203,9 +203,16 @@ const Index = () => {
    * Creates a new profile in the database
    */
   const handleOnboardingComplete = async (profileData: Omit<UserProfile, 'id'>) => {
-    if (!user) return;
+    console.log('handleOnboardingComplete called with:', profileData);
+    
+    if (!user) {
+      console.error('No user found - cannot save profile');
+      toast.error('Please sign in to complete your profile');
+      return;
+    }
 
     const validation = validateInput(profileSchema, profileData);
+    console.log('Validation result:', validation);
     if (!validation.success) {
       toast.error((validation as { success: false; error: string }).error);
       return;
@@ -213,6 +220,7 @@ const Index = () => {
     const validatedData = (validation as { success: true; data: typeof profileData }).data;
 
     setSavingProfile(true);
+    toast.info('Saving your profile...');
     try {
       const { error } = await supabase.from('profiles').insert({
         user_id: user.id,

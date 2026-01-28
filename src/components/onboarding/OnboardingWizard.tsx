@@ -44,18 +44,30 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   };
 
   const handleComplete = () => {
-    if (formData.name && formData.program && formData.studioPreferences.length > 0) {
-      onComplete({
-        name: formData.name,
-        program: formData.program as Program,
-        skills: formData.skills,
-        bio: formData.bio,
-        studioPreference: formData.studioPreferences[0], // Primary preference
-        studioPreferences: formData.studioPreferences,
-        avatar: formData.avatar || '', // Empty string triggers initials avatar
-        linkedIn: formData.linkedIn || undefined,
-      });
+    // Validate required fields with user feedback
+    if (!formData.name) {
+      console.error('Missing name in onboarding');
+      return;
     }
+    if (!formData.program) {
+      console.error('Missing program in onboarding');
+      return;
+    }
+    if (formData.studioPreferences.length === 0) {
+      console.error('Missing studio preferences in onboarding');
+      return;
+    }
+
+    onComplete({
+      name: formData.name,
+      program: formData.program as Program,
+      skills: formData.skills,
+      bio: formData.bio,
+      studioPreference: formData.studioPreferences[0], // Primary preference
+      studioPreferences: formData.studioPreferences,
+      avatar: formData.avatar || '', // Empty string triggers initials avatar
+      linkedIn: formData.linkedIn || undefined,
+    });
   };
 
   const variants = {
