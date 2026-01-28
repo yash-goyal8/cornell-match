@@ -49,16 +49,28 @@ const Auth = () => {
     // Don't redirect during password update flow
     if (mode === 'update-password') return;
     
+    console.log('Auth redirect check:', { loading, user: !!user, profileLoading, profile: !!profile });
+    
     // Wait for auth AND profile loading to complete
-    if (loading) return;
+    if (loading) {
+      console.log('Still loading auth...');
+      return;
+    }
     
     // No user = stay on auth page
-    if (!user) return;
+    if (!user) {
+      console.log('No user, staying on auth');
+      return;
+    }
     
     // User exists - wait for profile loading to finish
-    if (profileLoading) return;
+    if (profileLoading) {
+      console.log('Profile still loading...');
+      return;
+    }
     
     // Now we know: user exists, profile loading is done
+    console.log('Redirecting...', profile ? '/app' : '/onboarding');
     if (profile) {
       navigate('/app', { replace: true });
     } else {
@@ -163,7 +175,8 @@ const Auth = () => {
     }
   };
 
-  // Show loading only during initial auth check, not during form submission
+  // Show loading only during initial auth check, not during form submission or profile loading
+  // Profile loading should not block the form - redirect will happen automatically
   if (loading && !submitting) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

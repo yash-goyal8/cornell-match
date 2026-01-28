@@ -90,10 +90,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     isMountedRef.current = true;
+    let timeoutId: NodeJS.Timeout;
     
     // CRITICAL: Initial load must complete fully before any redirects can happen
     const initializeAuth = async () => {
       try {
+        // Set a timeout to prevent infinite loading
+        timeoutId = setTimeout(() => {
+          if (isMountedRef.current && loading) {
+            console.warn('Auth initialization timed out, forcing loading to false');
+            setLoading(false);
+          }
+        }, 5000);
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (!isMountedRef.current) return;
@@ -128,6 +137,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
+        clearTimeout(timeoutId);
         if (isMountedRef.current) {
           setLoading(false);
         }
@@ -143,13 +153,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         console.log('Auth state change:', event);
         
+        // Skip token refresh events - they don't change user state
+        if (event === 'TOKEN_REFRESHED') {
+          return;
+        }
+        
         if (session?.user) {
-          // Set profileLoading BEFORE setting user to prevent race condition
-          profileLoadingRef.current = true;
-          setProfileLoading(true);
-          
           setSession(session);
           setUser(session.user);
+          
+          // Always fetch profile on auth state change
+          profileLoadingRef.current = true;
+          setProfileLoading(true);
           
           const profileData = await fetchProfile(session.user.id);
           if (isMountedRef.current) {
