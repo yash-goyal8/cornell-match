@@ -362,7 +362,7 @@ const Index = () => {
   // LOADING & AUTH STATES
   // ============================================================================
 
-  // Show loading spinner during auth check - using inline styles for guaranteed visibility
+  // Show loading spinner only during initial auth check (max 5 seconds via AuthContext timeout)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
@@ -374,7 +374,7 @@ const Index = () => {
     );
   }
 
-  // Redirect to auth if no user (after loading completes)
+  // Redirect to auth if no user
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
@@ -386,21 +386,10 @@ const Index = () => {
     );
   }
   
-  // Show onboarding if no profile exists (profileLoading=false means we checked)
-  if (!profileLoading && !profile) {
-    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
-  }
-  
-  // If profile is still loading or doesn't exist yet, show loading
+  // Show onboarding if no profile (regardless of profileLoading state)
+  // This prevents getting stuck on loading if profile fetch hangs
   if (!profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto" style={{ color: '#ef4444' }} />
-          <p className="mt-4 text-lg" style={{ color: '#ffffff' }}>Loading profile...</p>
-        </div>
-      </div>
-    );
+    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
   
   // Track if data is still loading (for showing skeleton states in card area)

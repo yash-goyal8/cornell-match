@@ -1,10 +1,7 @@
 /**
- * AuthContext - Optimized Authentication Provider
+ * AuthContext - Simplified Authentication Provider
  * 
- * Industry-grade implementation with:
- * - Immediate session restore from cache
- * - Non-blocking profile fetch
- * - Proper cleanup and error handling
+ * Robust implementation with timeout to prevent stuck loading states
  */
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
@@ -23,9 +20,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Session cache key for faster startup
-const SESSION_CACHE_KEY = 'auth_session_cached';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -46,13 +40,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const isMountedRef = useRef(true);
-  const profileFetchRef = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
-    // Prevent duplicate fetches
-    if (profileFetchRef.current) return null;
-    profileFetchRef.current = true;
-    
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -82,8 +71,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (error) {
       console.error('Error fetching profile:', error);
       return null;
-    } finally {
-      profileFetchRef.current = false;
     }
   }, []);
 
@@ -100,41 +87,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     isMountedRef.current = true;
-    let authSubscription: { unsubscribe: () => void } | null = null;
+    
+    // CRITICAL: Set a timeout to ensure loading never stays stuck
+    const loadingTimeout = setTimeout(() => {
+      if (isMountedRef.current && loading) {
+        console.warn('Auth loading timeout - forcing completion');
+        setLoading(false);
+      }
+    }, 5000); // 5 second max wait
 
     const initSession = async () => {
       try {
-        // Fast path: Check for cached session indicator
-        const hasCachedSession = sessionStorage.getItem(SESSION_CACHE_KEY);
-        
-        // Get current session
         const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Session error:', error);
-          if (isMountedRef.current) {
-            setLoading(false);
-          }
-          return;
-        }
         
         if (!isMountedRef.current) return;
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Cache session presence for faster next load
-        if (session) {
-          sessionStorage.setItem(SESSION_CACHE_KEY, 'true');
-        } else {
-          sessionStorage.removeItem(SESSION_CACHE_KEY);
+        if (error) {
+          console.error('Session error:', error);
+          setLoading(false);
+          return;
         }
         
-        // CRITICAL: Set loading to false BEFORE fetching profile
-        // This allows the UI to render immediately
+        setSession(session);
+        setUser(session?.user ?? null);
         setLoading(false);
         
-        // Fetch profile in background (non-blocking)
+        // Fetch profile in background
         if (session?.user) {
           setProfileLoading(true);
           const profileData = await fetchProfile(session.user.id);
@@ -151,23 +129,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     };
 
-    // Start session check immediately
     initSession();
 
-    // Set up auth state listener for subsequent changes
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMountedRef.current) return;
         
         setSession(session);
         setUser(session?.user ?? null);
-        
-        // Update cache
-        if (session) {
-          sessionStorage.setItem(SESSION_CACHE_KEY, 'true');
-        } else {
-          sessionStorage.removeItem(SESSION_CACHE_KEY);
-        }
+        setLoading(false); // Always ensure loading is false on auth change
         
         if (session?.user) {
           setProfileLoading(true);
@@ -181,17 +152,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       }
     );
-    
-    authSubscription = subscription;
 
     return () => {
       isMountedRef.current = false;
-      authSubscription?.unsubscribe();
+      clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
     };
   }, [fetchProfile]);
 
   const signOut = useCallback(async () => {
-    sessionStorage.removeItem(SESSION_CACHE_KEY);
     await supabase.auth.signOut();
     setProfile(null);
   }, []);
