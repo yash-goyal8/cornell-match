@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Loader2, Users, ArrowLeft, Shield } from 'lucide-react';
 import { validatePasswordStrength, logSecurityEvent } from '@/lib/security';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 
-const Auth = forwardRef<HTMLDivElement>((_, ref) => {
+const Auth = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'update-password'>('login');
   const [email, setEmail] = useState('');
@@ -345,8 +345,6 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
       </motion.div>
     </div>
   );
-});
-
-Auth.displayName = 'Auth';
+};
 
 export default Auth;
