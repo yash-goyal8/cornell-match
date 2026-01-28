@@ -91,38 +91,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     isMountedRef.current = true;
     
-    // CRITICAL: Separate initial load from ongoing auth changes (Stack Overflow pattern)
-    
-    // 1. Listener for ONGOING auth changes (does NOT control initial loading)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMountedRef.current) return;
-        
-        console.log('Auth state change:', event);
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Fire and forget for ongoing changes - don't block loading
-        if (session?.user) {
-          profileLoadingRef.current = true;
-          setProfileLoading(true);
-          fetchProfile(session.user.id).then(profileData => {
-            if (isMountedRef.current) {
-              setProfile(profileData);
-              profileLoadingRef.current = false;
-              setProfileLoading(false);
-            }
-          });
-        } else {
-          setProfile(null);
-          profileLoadingRef.current = false;
-          setProfileLoading(false);
-        }
-      }
-    );
-
-    // 2. INITIAL load (controls isLoading) - must await all operations
+    // CRITICAL: Initial load must complete fully before any redirects can happen
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -131,27 +100,34 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         if (error) {
           console.error('Session error:', error);
+          setLoading(false);
           return;
         }
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Fetch profile BEFORE setting loading false
         if (session?.user) {
+          // Set profileLoading BEFORE setting user to prevent race condition
           profileLoadingRef.current = true;
           setProfileLoading(true);
+          
+          // Now set user
+          setSession(session);
+          setUser(session.user);
+          
+          // Fetch profile
           const profileData = await fetchProfile(session.user.id);
           if (isMountedRef.current) {
             setProfile(profileData);
             profileLoadingRef.current = false;
             setProfileLoading(false);
           }
+        } else {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
-        // ALWAYS set loading false after initialization
         if (isMountedRef.current) {
           setLoading(false);
         }
@@ -159,6 +135,37 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     initializeAuth();
+
+    // Listener for ONGOING auth changes (after initial load)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMountedRef.current) return;
+        
+        console.log('Auth state change:', event);
+        
+        if (session?.user) {
+          // Set profileLoading BEFORE setting user to prevent race condition
+          profileLoadingRef.current = true;
+          setProfileLoading(true);
+          
+          setSession(session);
+          setUser(session.user);
+          
+          const profileData = await fetchProfile(session.user.id);
+          if (isMountedRef.current) {
+            setProfile(profileData);
+            profileLoadingRef.current = false;
+            setProfileLoading(false);
+          }
+        } else {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          profileLoadingRef.current = false;
+          setProfileLoading(false);
+        }
+      }
+    );
 
     return () => {
       isMountedRef.current = false;
