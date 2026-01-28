@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 const Splash = () => {
   const navigate = useNavigate();
-  const { user, profile, loading, profileLoading } = useAuth();
   const [countdown, setCountdown] = useState(3);
-  const [hasNavigated, setHasNavigated] = useState(false);
+  const [showButton, setShowButton] = useState(false);
 
   // Countdown timer
   useEffect(() => {
@@ -16,6 +15,7 @@ const Splash = () => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+          setShowButton(true);
           return 0;
         }
         return prev - 1;
@@ -25,38 +25,9 @@ const Splash = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Navigation logic - ONLY after countdown AND all loading is complete
-  useEffect(() => {
-    // Don't navigate if already navigated
-    if (hasNavigated) return;
-    
-    // Wait for countdown to finish
-    if (countdown > 0) return;
-    
-    // Wait for auth loading to complete
-    if (loading) return;
-    
-    // If no user, go to auth immediately
-    if (!user) {
-      setHasNavigated(true);
-      navigate('/auth', { replace: true });
-      return;
-    }
-    
-    // User exists - wait for profile loading to complete before deciding
-    if (profileLoading) return;
-    
-    // Now we know: loading is done, profileLoading is done
-    setHasNavigated(true);
-    
-    if (profile) {
-      // Has profile → main app
-      navigate('/app', { replace: true });
-    } else {
-      // No profile → onboarding
-      navigate('/onboarding', { replace: true });
-    }
-  }, [countdown, loading, profileLoading, user, profile, navigate, hasNavigated]);
+  const handleGetStarted = () => {
+    navigate('/auth', { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -85,23 +56,35 @@ const Splash = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="text-muted-foreground max-w-xs mx-auto"
+          className="text-muted-foreground max-w-xs mx-auto mb-8"
         >
           Find your perfect teammates for Cornell Tech studio projects
         </motion.p>
 
-        {/* Loading indicator */}
+        {/* Get Started button or countdown */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="mt-8"
         >
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
-          </div>
+          {showButton ? (
+            <Button 
+              size="lg" 
+              onClick={handleGetStarted}
+              className="min-w-[200px]"
+            >
+              Get Started
+            </Button>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
+              </div>
+              <p className="text-sm text-muted-foreground">Loading in {countdown}s</p>
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </div>
