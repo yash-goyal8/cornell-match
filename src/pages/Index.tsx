@@ -370,32 +370,36 @@ const Index = () => {
   // LOADING & AUTH STATES
   // ============================================================================
 
-  // Show loading spinner only during initial auth check (max 5 seconds via AuthContext timeout)
+  // Show loading spinner during initial auth check
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto" style={{ color: '#ef4444' }} />
-          <p className="mt-4 text-lg" style={{ color: '#ffffff' }}>Loading...</p>
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
+          <p className="mt-4 text-lg text-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Redirect to auth if no user
+  // Redirect to auth if no user (useEffect handles the redirect)
   if (!user) {
+    return null; // Return null - useEffect will redirect
+  }
+  
+  // Show loading while profile is being fetched
+  if (profileLoading && !profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0a0f1a' }}>
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto" style={{ color: '#ef4444' }} />
-          <p className="mt-4 text-lg" style={{ color: '#ffffff' }}>Redirecting...</p>
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
+          <p className="mt-4 text-lg text-foreground">Loading profile...</p>
         </div>
       </div>
     );
   }
   
-  // Show onboarding if no profile (regardless of profileLoading state)
-  // This prevents getting stuck on loading if profile fetch hangs
+  // Show onboarding only if user exists, profile loading is done, and no profile
   if (!profile) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
