@@ -31,38 +31,57 @@ const Auth = () => {
       searchParams.get('reset') === 'true';
     
     if (isRecoveryFlow) {
-      // Mark as recovery mode and wait for PASSWORD_RECOVERY event
       isRecoveryModeRef.current = true;
       setCheckingAuth(false);
     } else {
-      // Check if already logged in (only if not recovery flow)
-      supabase.auth.getSession().then(({ data: { session } }) => {
+      // Check if already logged in
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (session && !isRecoveryModeRef.current) {
-          navigate('/');
+          // Check if user has profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (profile) {
+            navigate('/app', { replace: true });
+          } else {
+            navigate('/onboarding', { replace: true });
+          }
         }
         setCheckingAuth(false);
       });
     }
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth event:', event);
       
       if (event === 'PASSWORD_RECOVERY') {
-        // User clicked the password reset link - show update password form
         isRecoveryModeRef.current = true;
         setMode('update-password');
         setCheckingAuth(false);
         return;
       }
       
-      // Don't redirect if we're in recovery mode
       if (isRecoveryModeRef.current) {
         return;
       }
       
       if (event === 'SIGNED_IN' && session) {
-        navigate('/');
+        // Check if user has profile to decide where to go
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        if (profile) {
+          navigate('/app', { replace: true });
+        } else {
+          navigate('/onboarding', { replace: true });
+        }
       }
     });
 

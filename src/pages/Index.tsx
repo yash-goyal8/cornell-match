@@ -20,7 +20,7 @@ import { Loader2, Plus, History } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { SwipeableCard } from '@/components/SwipeableCard';
 import { SwipeableTeamCard } from '@/components/SwipeableTeamCard';
-import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+// OnboardingWizard moved to separate /onboarding route
 import { ProfileDetailModal } from '@/components/ProfileDetailModal';
 import { TeamDetailModal } from '@/components/TeamDetailModal';
 import { MyProfileModal } from '@/components/MyProfileModal';
@@ -185,72 +185,24 @@ const Index = () => {
   });
 
   // ============================================================================
-  // AUTH REDIRECT
+  // AUTH REDIRECT - Protect this route
   // ============================================================================
   
   useEffect(() => {
-    if (!loading && (!user || !session)) {
-      navigate('/auth');
+    if (!loading) {
+      if (!user || !session) {
+        // Not logged in → go to splash/auth
+        navigate('/', { replace: true });
+      } else if (!profile && !profileLoading) {
+        // Logged in but no profile → go to onboarding
+        navigate('/onboarding', { replace: true });
+      }
     }
-  }, [user, session, loading, navigate]);
+  }, [user, session, profile, loading, profileLoading, navigate]);
 
   // ============================================================================
   // PROFILE HANDLERS
   // ============================================================================
-
-  /**
-   * Handles completing the onboarding wizard
-   * Creates a new profile in the database
-   */
-  const handleOnboardingComplete = async (profileData: Omit<UserProfile, 'id'>) => {
-    console.log('handleOnboardingComplete called with:', profileData);
-    
-    if (!user) {
-      console.error('No user found - cannot save profile');
-      toast.error('Please sign in to complete your profile');
-      return;
-    }
-
-    const validation = validateInput(profileSchema, profileData);
-    console.log('Validation result:', validation);
-    if (!validation.success) {
-      toast.error((validation as { success: false; error: string }).error);
-      return;
-    }
-    const validatedData = (validation as { success: true; data: typeof profileData }).data;
-
-    setSavingProfile(true);
-    toast.info('Saving your profile...');
-    try {
-      const { error } = await supabase.from('profiles').insert({
-        user_id: user.id,
-        name: validatedData.name,
-        program: validatedData.program,
-        skills: validatedData.skills,
-        bio: validatedData.bio,
-        studio_preference: validatedData.studioPreference,
-        studio_preferences: validatedData.studioPreferences,
-        avatar: validatedData.avatar,
-        linkedin: validatedData.linkedIn,
-      });
-
-      if (error) {
-        console.error('Error saving profile:', error);
-        toast.error('Failed to save profile. Please try again.');
-        return;
-      }
-
-      await refreshProfile();
-      toast.success(`Welcome, ${validatedData.name}!`, {
-        description: 'Your profile is ready. Start swiping to find teammates!',
-      });
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      toast.error('An unexpected error occurred');
-    } finally {
-      setSavingProfile(false);
-    }
-  };
 
   /**
    * Handles updating an existing profile
@@ -371,7 +323,7 @@ const Index = () => {
   // ============================================================================
 
   // Show loading spinner during initial auth check
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -382,28 +334,9 @@ const Index = () => {
     );
   }
 
-  // CRITICAL: If no user OR no session, redirect to auth page
-  // This ensures unauthenticated users ALWAYS see the login page first
-  if (!user || !session) {
-    // useEffect handles the actual redirect, but return null to prevent flash
+  // Not authenticated or no profile - useEffect will redirect
+  if (!user || !session || !profile) {
     return null;
-  }
-  
-  // Show loading while profile is being fetched (only for authenticated users)
-  if (profileLoading && !profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
-          <p className="mt-4 text-lg text-foreground">Loading profile...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Show onboarding only for authenticated users without a profile
-  if (!profile) {
-    return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
   
   // Track if data is still loading (for showing skeleton states in card area)

@@ -7,9 +7,11 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/queryClient";
 
-// Direct imports instead of lazy loading to avoid ref issues
-import Index from "./pages/Index";
+// Page imports
+import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
+import Onboarding from "./pages/Onboarding";
+import MainApp from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 const App = () => (
@@ -21,9 +23,19 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index />} />
+              {/* Splash screen - entry point */}
+              <Route path="/" element={<Splash />} />
+              
+              {/* Auth pages */}
               <Route path="/auth" element={<Auth />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              
+              {/* Onboarding for new users */}
+              <Route path="/onboarding" element={<Onboarding />} />
+              
+              {/* Main app for authenticated users with profile */}
+              <Route path="/app" element={<MainApp />} />
+              
+              {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
