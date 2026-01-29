@@ -21,17 +21,30 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Check for recovery token in URL on mount
+  const [sessionCleared, setSessionCleared] = useState(false);
+  const [justAuthenticated, setJustAuthenticated] = useState(false);
+
+  // Clear any existing session on mount - force fresh authentication
   useEffect(() => {
-    const hash = window.location.hash;
-    const searchParams = new URLSearchParams(window.location.search);
-    const isRecoveryFlow = 
-      (hash && (hash.includes('type=recovery') || hash.includes('type=magiclink'))) ||
-      searchParams.get('reset') === 'true';
+    const clearSession = async () => {
+      const hash = window.location.hash;
+      const searchParams = new URLSearchParams(window.location.search);
+      const isRecoveryFlow = 
+        (hash && (hash.includes('type=recovery') || hash.includes('type=magiclink'))) ||
+        searchParams.get('reset') === 'true';
+      
+      if (isRecoveryFlow) {
+        setMode('update-password');
+        setSessionCleared(true);
+        return;
+      }
+
+      // Clear existing session to force re-authentication
+      await supabase.auth.signOut();
+      setSessionCleared(true);
+    };
     
-    if (isRecoveryFlow) {
-      setMode('update-password');
-    }
+    clearSession();
   }, []);
 
   // Handle PASSWORD_RECOVERY event
@@ -44,15 +57,16 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Redirect when authenticated
+  // Only redirect AFTER explicit authentication action (not on existing session)
   useEffect(() => {
     if (mode === 'update-password') return;
+    if (!justAuthenticated) return; // Only redirect after user explicitly logs in
     if (loading || !user) return;
     if (profileLoading) return;
     
     // User logged in with profile -> app, without profile -> onboarding
     navigate(profile ? '/app' : '/onboarding', { replace: true });
-  }, [user, profile, loading, profileLoading, mode, navigate]);
+  }, [user, profile, loading, profileLoading, mode, navigate, justAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +142,7 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success('Welcome back!');
+        setJustAuthenticated(true); // Mark as explicitly authenticated
         // Set a max timeout to prevent stuck state - redirect should happen faster
         setTimeout(() => setSubmitting(false), 8000);
       } else {
@@ -138,6 +153,7 @@ const Auth = () => {
         });
         if (error) throw error;
         toast.success('Account created! Redirecting...');
+        setJustAuthenticated(true); // Mark as explicitly authenticated
         // For signup, redirect to onboarding immediately (trigger created placeholder profile)
         setTimeout(() => {
           setSubmitting(false);
