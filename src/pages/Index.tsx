@@ -80,6 +80,7 @@ const Index = () => {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatRefreshKey, setChatRefreshKey] = useState(0);
   const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
   const [isTeamManagementOpen, setIsTeamManagementOpen] = useState(false);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
@@ -181,7 +182,10 @@ const Index = () => {
     createIndividualToIndividualMatch,
     createTeamToIndividualMatch,
     createIndividualToTeamMatch,
-    openChat: () => setIsChatOpen(true),
+    openChat: () => {
+      setChatRefreshKey(k => k + 1); // Force chat to re-fetch
+      setIsChatOpen(true);
+    },
   });
 
   // ============================================================================
@@ -583,6 +587,7 @@ const Index = () => {
 
       {/* Chat Modal */}
       <ChatModal
+        key={chatRefreshKey}
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         currentUserId={user?.id || 'dev-user'}
