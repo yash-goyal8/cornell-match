@@ -713,6 +713,7 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
             unreadCounts={unreadCounts}
             activeTab={activeTab}
             onTabChange={setActiveTab}
+            currentUserId={currentUserId}
           />
         ) : selectedConversation ? (
           <ChatRoom
