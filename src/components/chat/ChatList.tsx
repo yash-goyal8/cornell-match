@@ -17,6 +17,7 @@ interface ChatListProps {
   unreadCounts: Record<string, number>;
   activeTab: 'chats' | 'matches';
   onTabChange: (tab: 'chats' | 'matches') => void;
+  currentUserId: string;
 }
 
 export const ChatList = ({
@@ -29,6 +30,7 @@ export const ChatList = ({
   unreadCounts,
   activeTab,
   onTabChange,
+  currentUserId,
 }: ChatListProps) => {
   // Show pending matches that the user can start chatting with
   const pendingMatches = matches.filter(m => m.status === 'pending' || m.status === 'matched');
@@ -98,19 +100,33 @@ export const ChatList = ({
                 const isJoinRequest = !!conversation.match;
                 const isPending = conversation.match?.status === 'pending';
                 
-                // Determine display name
+                // Determine display name based on perspective
                 let displayName = '';
                 let displayAvatar = '';
+                let showAsTeam = false;
                 
                 if (isJoinRequest && conversation.match) {
-                  // For join requests, show the individual's name with team context
-                  displayName = conversation.match.individual_profile?.name || 'Unknown';
-                  displayAvatar = conversation.match.individual_profile?.avatar || '';
+                  // Check if current user is the individual who initiated the request
+                  const isCurrentUserTheIndividual = 
+                    (conversation.match.match_type === 'individual_to_team' && conversation.match.user_id === currentUserId) ||
+                    (conversation.match.match_type === 'team_to_individual' && conversation.match.target_user_id === currentUserId);
+                  
+                  if (isCurrentUserTheIndividual) {
+                    // Individual's perspective: show team name
+                    displayName = conversation.match.team?.name || 'Unknown Team';
+                    displayAvatar = '';
+                    showAsTeam = true;
+                  } else {
+                    // Team member's perspective: show individual's name
+                    displayName = conversation.match.individual_profile?.name || 'Unknown';
+                    displayAvatar = conversation.match.individual_profile?.avatar || '';
+                  }
                 } else if (conversation.type === 'direct' || conversation.type === 'match') {
                   displayName = conversation.other_user?.name || 'Unknown';
                   displayAvatar = conversation.other_user?.avatar || '';
                 } else {
                   displayName = conversation.team?.name || 'Team Chat';
+                  showAsTeam = true;
                 }
                 
                 return (
@@ -124,7 +140,7 @@ export const ChatList = ({
                     whileTap={{ scale: 0.98 }}
                   >
                     <div className="relative">
-                      {conversation.type === 'team' && !isJoinRequest ? (
+                      {showAsTeam ? (
                         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                           <Users className="w-5 h-5 text-primary" />
                         </div>
