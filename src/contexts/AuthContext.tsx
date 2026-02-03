@@ -71,7 +71,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
 
       // Only return profile if it's been completed (not auto-created placeholder)
-      if (data && data.name && data.name !== 'Undeclared') {
+      // The trigger sets program='Undeclared' and studio_preference='Undeclared' for new signups
+      const isIncompleteProfile = !data || 
+        data.program === 'Undeclared' || 
+        data.studio_preference === 'Undeclared' ||
+        !data.name;
+      
+      if (data && !isIncompleteProfile) {
         return {
           id: data.id,
           name: data.name,
