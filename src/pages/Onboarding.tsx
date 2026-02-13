@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { profileSchema, validateInput } from '@/lib/validation';
 import { UserProfile } from '@/types';
 import { Loader2 } from 'lucide-react';
+import { uploadAvatar, dataUrlToFile } from '@/lib/avatarUpload';
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -49,6 +50,18 @@ const Onboarding = () => {
     setSaving(true);
     try {
       toast.info('Saving your profile...');
+
+      // Upload avatar to storage if provided (base64)
+      let avatarUrl = '';
+      if (validatedData.avatar && validatedData.avatar.startsWith('data:')) {
+        try {
+          const file = dataUrlToFile(validatedData.avatar);
+          avatarUrl = await uploadAvatar(user.id, file);
+        } catch (err) {
+          console.warn('Avatar upload failed, continuing without:', err);
+        }
+      }
+
       const { error } = await supabase.from('profiles').insert({
         user_id: user.id,
         name: validatedData.name,
@@ -57,7 +70,7 @@ const Onboarding = () => {
         bio: validatedData.bio,
         studio_preference: validatedData.studioPreference,
         studio_preferences: validatedData.studioPreferences,
-        avatar: validatedData.avatar,
+        avatar: avatarUrl,
         linkedin: validatedData.linkedIn,
       });
 
