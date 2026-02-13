@@ -25,45 +25,18 @@ export function useUnreadCount(userId: string | undefined): number {
     fetchingRef.current = true;
 
     try {
-      // Parallel fetch: participations and read timestamps
-      const [participationsRes, readsRes] = await Promise.all([
-        supabase
-          .from('conversation_participants')
-          .select('conversation_id')
-          .eq('user_id', userId),
-        supabase
-          .from('message_reads')
-          .select('conversation_id, last_read_at')
-          .eq('user_id', userId)
-      ]);
+      // Use optimized database function instead of multiple queries
+      const { data, error } = await supabase.rpc('get_unread_count', {
+        p_user_id: userId,
+      });
 
-      const participations = participationsRes.data;
-      if (!participations || participations.length === 0) {
-        if (isMountedRef.current) setUnreadCount(0);
+      if (error) {
+        console.error('Error fetching unread count:', error);
         return;
       }
 
-      const conversationIds = participations.map(p => p.conversation_id);
-      const readMap = new Map(readsRes.data?.map(r => [r.conversation_id, r.last_read_at]) || []);
-
-      // Fetch all messages from these conversations not sent by user
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('conversation_id, created_at')
-        .in('conversation_id', conversationIds)
-        .neq('sender_id', userId);
-
-      // Count unread messages client-side
-      let total = 0;
-      (messages || []).forEach(msg => {
-        const lastRead = readMap.get(msg.conversation_id);
-        if (!lastRead || new Date(msg.created_at) > new Date(lastRead)) {
-          total++;
-        }
-      });
-
       if (isMountedRef.current) {
-        setUnreadCount(total);
+        setUnreadCount(data || 0);
       }
     } catch (error) {
       console.error('Error fetching unread count:', error);
