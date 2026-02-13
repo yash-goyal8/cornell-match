@@ -27,15 +27,15 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<'chats' | 'matches'>('chats');
 
-  // Fetch all chat data in optimized batches (not N+1)
+  // Fetch all chat data in optimized parallel batches
   useEffect(() => {
     if (!isOpen || !currentUserId) return;
 
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // === BATCH 1: Parallel base queries ===
-        const [participationsRes, teamMembershipsRes] = await Promise.all([
+        // === ROUND 1: All independent base queries in parallel ===
+        const [participationsRes, teamMembershipsRes, userMatchesRes] = await Promise.all([
           supabase
             .from('conversation_participants')
             .select('conversation_id')
@@ -45,279 +45,226 @@ export const ChatModal = ({ isOpen, onClose, currentUserId, onMemberAdded }: Cha
             .select('team_id')
             .eq('user_id', currentUserId)
             .eq('status', 'confirmed'),
+          supabase
+            .from('matches')
+            .select('*')
+            .or(`user_id.eq.${currentUserId},target_user_id.eq.${currentUserId}`),
         ]);
 
         const teamIds = (teamMembershipsRes.data || []).map(m => m.team_id);
         setUserTeamIds(teamIds);
         const participantConvIds = (participationsRes.data || []).map(p => p.conversation_id);
 
-        // === BATCH 2: Get matches (both team and individual) in parallel ===
-        const matchQueries = [
-          supabase
+        // Merge user matches with team matches (if any) — single additional query only if needed
+        const allMatchesMap = new Map<string, any>();
+        (userMatchesRes.data || []).forEach((m: any) => allMatchesMap.set(m.id, m));
+
+        if (teamIds.length > 0) {
+          const { data: teamMatches } = await supabase
             .from('matches')
             .select('*')
-            .or(`user_id.eq.${currentUserId},target_user_id.eq.${currentUserId}`),
-        ];
-        if (teamIds.length > 0) {
-          matchQueries.push(
-            supabase
-              .from('matches')
-              .select('*')
-              .in('team_id', teamIds)
-          );
+            .in('team_id', teamIds);
+          (teamMatches || []).forEach((m: any) => allMatchesMap.set(m.id, m));
         }
 
-        const matchResults = await Promise.all(matchQueries);
-        
-        // Deduplicate all matches by id
-        const allMatchesMap = new Map<string, any>();
-        matchResults.forEach(res => {
-          (res.data || []).forEach((m: any) => allMatchesMap.set(m.id, m));
-        });
         const allMatches = Array.from(allMatchesMap.values());
         const matchIds = allMatches.map(m => m.id);
 
-        // === BATCH 3: Get conversations for all match IDs + participant conv IDs ===
-        let matchConvIds: string[] = [];
-        if (matchIds.length > 0) {
-          const { data: matchConvs } = await supabase
-            .from('conversations')
-            .select('id')
-            .in('match_id', matchIds);
-          matchConvIds = (matchConvs || []).map(c => c.id);
-        }
+        // === ROUND 2: Get conversations + unread count in parallel ===
+        const unreadPromise = supabase.rpc('get_unread_count', { p_user_id: currentUserId });
+        const matchConvPromise = matchIds.length > 0
+          ? supabase.from('conversations').select('id').in('match_id', matchIds)
+          : Promise.resolve({ data: [] as { id: string }[] });
 
+        const [unreadCountRes, matchConvsRes] = await Promise.all([unreadPromise, matchConvPromise]);
+        const matchConvIds = (matchConvsRes?.data || []).map((c: any) => c.id);
         const allConvIds = [...new Set([...participantConvIds, ...matchConvIds])];
 
-        if (allConvIds.length > 0) {
-          // === BATCH 4: Fetch conversations + all related data in parallel ===
-          const [convDataRes, allParticipantsRes, unreadCountRes] = await Promise.all([
-            supabase.from('conversations').select('*').in('id', allConvIds),
-            supabase
-              .from('conversation_participants')
-              .select('conversation_id, user_id')
-              .in('conversation_id', allConvIds)
-              .neq('user_id', currentUserId),
-            // Use optimized RPC for unread count
-            supabase.rpc('get_unread_count', { p_user_id: currentUserId }),
-          ]);
+        if (allConvIds.length === 0) {
+          setConversations([]);
+          setUnreadCounts({});
+          // Still build matches from allMatches with profiles
+          await buildMatchesTab(allMatches, new Map());
+          return;
+        }
 
-          const convData = convDataRes.data || [];
+        // === ROUND 3: Fetch ALL remaining data in one parallel batch ===
+        // Collect user/team IDs we'll need from matches (known already)
+        const userIdsNeeded = new Set<string>();
+        const teamIdsNeeded = new Set<string>();
+        allMatches.forEach(m => {
+          userIdsNeeded.add(m.user_id);
+          userIdsNeeded.add(m.target_user_id);
+          if (m.team_id) teamIdsNeeded.add(m.team_id);
+        });
+        userIdsNeeded.delete(currentUserId);
 
-          // Collect all user IDs we need profiles for (from matches + participants)
-          const userIdsNeeded = new Set<string>();
-          allMatches.forEach(m => {
-            userIdsNeeded.add(m.user_id);
-            userIdsNeeded.add(m.target_user_id);
-          });
-          (allParticipantsRes.data || []).forEach(p => userIdsNeeded.add(p.user_id));
-          userIdsNeeded.delete(currentUserId);
+        const [convDataRes, allParticipantsRes, profilesRes, teamsRes, memberCountsRes] = await Promise.all([
+          supabase.from('conversations').select('*').in('id', allConvIds),
+          supabase
+            .from('conversation_participants')
+            .select('conversation_id, user_id')
+            .in('conversation_id', allConvIds)
+            .neq('user_id', currentUserId),
+          supabase
+            .from('profiles')
+            .select('user_id, name, avatar, program')
+            .in('user_id', Array.from(userIdsNeeded)),
+          teamIdsNeeded.size > 0
+            ? supabase.from('teams').select('id, name').in('id', Array.from(teamIdsNeeded))
+            : Promise.resolve({ data: [] }),
+          teamIdsNeeded.size > 0
+            ? supabase.from('team_members').select('team_id').in('team_id', Array.from(teamIdsNeeded)).eq('status', 'confirmed')
+            : Promise.resolve({ data: [] }),
+        ]);
 
-          // Collect all team IDs we need
-          const teamIdsNeeded = new Set<string>();
-          allMatches.forEach(m => { if (m.team_id) teamIdsNeeded.add(m.team_id); });
-          convData.forEach(c => { if (c.team_id) teamIdsNeeded.add(c.team_id); });
+        const convData = convDataRes.data || [];
 
-          // === BATCH 5: Fetch all profiles + teams in ONE batch each ===
-          const [profilesRes, teamsRes, memberCountsRes] = await Promise.all([
-            userIdsNeeded.size > 0
-              ? supabase
-                  .from('profiles')
-                  .select('user_id, name, avatar, program')
-                  .in('user_id', Array.from(userIdsNeeded))
-              : Promise.resolve({ data: [] }),
-            teamIdsNeeded.size > 0
-              ? supabase
-                  .from('teams')
-                  .select('id, name')
-                  .in('id', Array.from(teamIdsNeeded))
-              : Promise.resolve({ data: [] }),
-            teamIdsNeeded.size > 0
-              ? supabase
-                  .from('team_members')
-                  .select('team_id', { count: 'exact' })
-                  .in('team_id', Array.from(teamIdsNeeded))
-                  .eq('status', 'confirmed')
-              : Promise.resolve({ data: [], count: 0 }),
-          ]);
+        // Add participant user IDs that weren't in matches
+        const extraUserIds: string[] = [];
+        (allParticipantsRes.data || []).forEach((p: any) => {
+          if (!userIdsNeeded.has(p.user_id)) extraUserIds.push(p.user_id);
+        });
+        // Add team IDs from conversations not in matches
+        convData.forEach(c => { if (c.team_id && !teamIdsNeeded.has(c.team_id)) teamIdsNeeded.add(c.team_id); });
 
-          // Build lookup maps
-          const profilesMap = new Map<string, { user_id: string; name: string; avatar: string; program: string }>();
-          (profilesRes.data || []).forEach((p: any) => profilesMap.set(p.user_id, p));
+        // Fetch any extra profiles/teams we discovered (usually none)
+        let extraProfilesMap = new Map<string, any>();
+        if (extraUserIds.length > 0) {
+          const { data } = await supabase.from('profiles').select('user_id, name, avatar, program').in('user_id', extraUserIds);
+          (data || []).forEach((p: any) => extraProfilesMap.set(p.user_id, p));
+        }
 
-          const teamsMap = new Map<string, { id: string; name: string }>();
-          (teamsRes.data || []).forEach((t: any) => teamsMap.set(t.id, t));
+        // Build lookup maps
+        const profilesMap = new Map<string, any>();
+        (profilesRes.data || []).forEach((p: any) => profilesMap.set(p.user_id, p));
+        extraProfilesMap.forEach((v, k) => profilesMap.set(k, v));
 
-          // Count members per team from the raw data
-          const memberCountMap = new Map<string, number>();
-          if (memberCountsRes.data) {
-            (memberCountsRes.data as any[]).forEach((row: any) => {
-              memberCountMap.set(row.team_id, (memberCountMap.get(row.team_id) || 0) + 1);
-            });
-          }
+        const teamsMap = new Map<string, any>();
+        (teamsRes.data || []).forEach((t: any) => teamsMap.set(t.id, t));
 
-          // Build match lookup by id
-          const matchesById = new Map<string, any>();
-          allMatches.forEach(m => matchesById.set(m.id, m));
+        const memberCountMap = new Map<string, number>();
+        (memberCountsRes.data || []).forEach((row: any) => {
+          memberCountMap.set(row.team_id, (memberCountMap.get(row.team_id) || 0) + 1);
+        });
 
-          // Build participants lookup by conversation_id
-          const participantsByConv = new Map<string, string[]>();
-          (allParticipantsRes.data || []).forEach((p: any) => {
-            const list = participantsByConv.get(p.conversation_id) || [];
-            list.push(p.user_id);
-            participantsByConv.set(p.conversation_id, list);
-          });
+        const matchesById = new Map<string, any>();
+        allMatches.forEach(m => matchesById.set(m.id, m));
 
-          // === ASSEMBLE conversations with all details (no more N+1!) ===
-          const conversationsWithDetails: Conversation[] = convData.map(conv => {
-            let otherUser = undefined;
-            let team = undefined;
-            let match = undefined;
+        const participantsByConv = new Map<string, string[]>();
+        (allParticipantsRes.data || []).forEach((p: any) => {
+          const list = participantsByConv.get(p.conversation_id) || [];
+          list.push(p.user_id);
+          participantsByConv.set(p.conversation_id, list);
+        });
 
-            if (conv.match_id) {
-              const matchData = matchesById.get(conv.match_id);
-              if (matchData) {
-                if (matchData.match_type === 'individual_to_individual') {
-                  const otherUserId = matchData.user_id === currentUserId
-                    ? matchData.target_user_id
-                    : matchData.user_id;
-                  const profile = profilesMap.get(otherUserId);
-                  if (profile) {
-                    otherUser = { id: profile.user_id, name: profile.name, avatar: profile.avatar || '' };
-                  }
-                } else {
-                  // Team-based match
-                  const teamData = matchData.team_id ? teamsMap.get(matchData.team_id) : null;
-                  const individualUserId = matchData.match_type === 'team_to_individual'
-                    ? matchData.target_user_id
-                    : matchData.user_id;
-                  const individualProfile = profilesMap.get(individualUserId);
+        // === ASSEMBLE conversations (no N+1) ===
+        const conversationsWithDetails: Conversation[] = convData.map(conv => {
+          let otherUser = undefined;
+          let team = undefined;
+          let match = undefined;
 
-                  match = {
-                    id: matchData.id,
-                    user_id: matchData.user_id,
-                    target_user_id: matchData.target_user_id,
-                    team_id: matchData.team_id,
-                    match_type: matchData.match_type as 'team_to_individual' | 'individual_to_team',
-                    status: matchData.status as 'pending' | 'matched' | 'rejected' | 'accepted',
-                    team: teamData ? { id: teamData.id, name: teamData.name } : undefined,
-                    individual_profile: individualProfile ? {
-                      id: individualProfile.user_id,
-                      name: individualProfile.name,
-                      avatar: individualProfile.avatar || '',
-                      program: individualProfile.program,
-                    } : undefined,
-                  };
-
-                  if (individualProfile) {
-                    otherUser = { id: individualProfile.user_id, name: individualProfile.name, avatar: individualProfile.avatar || '' };
-                  }
-                  if (teamData) {
-                    team = { id: teamData.id, name: teamData.name };
-                  }
-                }
-              }
-            } else if (conv.type === 'direct' || conv.type === 'match') {
-              const otherUserIds = participantsByConv.get(conv.id) || [];
-              const otherUserId = otherUserIds[0];
-              if (otherUserId) {
+          if (conv.match_id) {
+            const matchData = matchesById.get(conv.match_id);
+            if (matchData) {
+              if (matchData.match_type === 'individual_to_individual') {
+                const otherUserId = matchData.user_id === currentUserId
+                  ? matchData.target_user_id : matchData.user_id;
                 const profile = profilesMap.get(otherUserId);
                 if (profile) {
                   otherUser = { id: profile.user_id, name: profile.name, avatar: profile.avatar || '' };
                 }
-              }
-            } else if (conv.type === 'team' && conv.team_id) {
-              const teamData = teamsMap.get(conv.team_id);
-              if (teamData) {
-                team = {
-                  id: teamData.id,
-                  name: teamData.name,
-                  member_count: memberCountMap.get(conv.team_id) || 0,
+              } else {
+                const teamData = matchData.team_id ? teamsMap.get(matchData.team_id) : null;
+                const individualUserId = matchData.match_type === 'team_to_individual'
+                  ? matchData.target_user_id : matchData.user_id;
+                const individualProfile = profilesMap.get(individualUserId);
+
+                match = {
+                  id: matchData.id,
+                  user_id: matchData.user_id,
+                  target_user_id: matchData.target_user_id,
+                  team_id: matchData.team_id,
+                  match_type: matchData.match_type as 'team_to_individual' | 'individual_to_team',
+                  status: matchData.status as 'pending' | 'matched' | 'rejected' | 'accepted',
+                  team: teamData ? { id: teamData.id, name: teamData.name } : undefined,
+                  individual_profile: individualProfile ? {
+                    id: individualProfile.user_id, name: individualProfile.name,
+                    avatar: individualProfile.avatar || '', program: individualProfile.program,
+                  } : undefined,
                 };
+
+                if (individualProfile) {
+                  otherUser = { id: individualProfile.user_id, name: individualProfile.name, avatar: individualProfile.avatar || '' };
+                }
+                if (teamData) {
+                  team = { id: teamData.id, name: teamData.name };
+                }
               }
             }
-
-            return {
-              ...conv,
-              type: conv.type as 'direct' | 'team' | 'match',
-              other_user: otherUser,
-              team,
-              match,
-            };
-          });
-
-          setConversations(conversationsWithDetails);
-          
-          // Use total unread count from RPC (already computed efficiently)
-          // For per-conversation counts, we set empty since ChatList uses total
-          setUnreadCounts({});
-        } else {
-          setConversations([]);
-          setUnreadCounts({});
-        }
-
-        // Fetch individual matches for the Matches tab
-        const individualMatches = allMatches.filter(m =>
-          m.match_type === 'individual' || m.match_type === 'individual_to_individual'
-        );
-
-        const matchesWithProfiles: Match[] = individualMatches.map(match => {
-          const otherUserId = match.user_id === currentUserId
-            ? match.target_user_id
-            : match.user_id;
-          
-          // We already have profiles from batch 5
-          let profile: any = null;
-          // Re-fetch from allMatches context - profiles might need separate lookup
-          const cachedProfile = conversations.length === 0 ? null : null; // Will use inline lookup
+          } else if (conv.type === 'direct' || conv.type === 'match') {
+            const otherUserIds = participantsByConv.get(conv.id) || [];
+            const otherUserId = otherUserIds[0];
+            if (otherUserId) {
+              const profile = profilesMap.get(otherUserId);
+              if (profile) {
+                otherUser = { id: profile.user_id, name: profile.name, avatar: profile.avatar || '' };
+              }
+            }
+          } else if (conv.type === 'team' && conv.team_id) {
+            const teamData = teamsMap.get(conv.team_id);
+            if (teamData) {
+              team = { id: teamData.id, name: teamData.name, member_count: memberCountMap.get(conv.team_id) || 0 };
+            }
+          }
 
           return {
-            ...match,
-            match_type: match.match_type as 'individual' | 'individual_to_individual' | 'team_to_individual' | 'individual_to_team',
-            status: match.status as 'pending' | 'matched' | 'rejected' | 'accepted',
-            target_profile: undefined, // Will be populated below
+            ...conv, type: conv.type as 'direct' | 'team' | 'match',
+            other_user: otherUser, team, match,
           };
         });
 
-        // Batch fetch profiles for matches tab
-        const matchProfileIds = individualMatches.map(m =>
-          m.user_id === currentUserId ? m.target_user_id : m.user_id
-        );
-        
-        let matchProfilesMap = new Map<string, any>();
-        if (matchProfileIds.length > 0) {
-          const { data: matchProfiles } = await supabase
-            .from('profiles')
-            .select('user_id, name, avatar, program')
-            .in('user_id', matchProfileIds);
-          (matchProfiles || []).forEach((p: any) => matchProfilesMap.set(p.user_id, p));
-        }
+        setConversations(conversationsWithDetails);
+        setUnreadCounts({});
 
-        const finalMatches: Match[] = individualMatches.map(match => {
-          const otherUserId = match.user_id === currentUserId
-            ? match.target_user_id
-            : match.user_id;
-          const profile = matchProfilesMap.get(otherUserId);
-
-          return {
-            ...match,
-            match_type: match.match_type as 'individual' | 'individual_to_individual' | 'team_to_individual' | 'individual_to_team',
-            status: match.status as 'pending' | 'matched' | 'rejected' | 'accepted',
-            target_profile: profile ? {
-              id: profile.user_id,
-              name: profile.name,
-              avatar: profile.avatar || '',
-              program: profile.program,
-            } : undefined,
-          };
-        });
-
-        setMatches(finalMatches);
+        // Build matches tab reusing already-fetched profiles (no duplicate query!)
+        await buildMatchesTab(allMatches, profilesMap);
       } catch (error) {
         console.error('Error fetching chat data:', error);
       } finally {
         setIsLoading(false);
       }
+    };
+
+    const buildMatchesTab = async (allMatches: any[], profilesMap: Map<string, any>) => {
+      const individualMatches = allMatches.filter(m =>
+        m.match_type === 'individual' || m.match_type === 'individual_to_individual'
+      );
+
+      // Check if we need any profiles not already cached
+      const missingIds = individualMatches
+        .map(m => m.user_id === currentUserId ? m.target_user_id : m.user_id)
+        .filter(id => !profilesMap.has(id));
+
+      if (missingIds.length > 0) {
+        const { data } = await supabase.from('profiles').select('user_id, name, avatar, program').in('user_id', missingIds);
+        (data || []).forEach((p: any) => profilesMap.set(p.user_id, p));
+      }
+
+      const finalMatches: Match[] = individualMatches.map(match => {
+        const otherUserId = match.user_id === currentUserId ? match.target_user_id : match.user_id;
+        const profile = profilesMap.get(otherUserId);
+        return {
+          ...match,
+          match_type: match.match_type as 'individual' | 'individual_to_individual' | 'team_to_individual' | 'individual_to_team',
+          status: match.status as 'pending' | 'matched' | 'rejected' | 'accepted',
+          target_profile: profile ? {
+            id: profile.user_id, name: profile.name, avatar: profile.avatar || '', program: profile.program,
+          } : undefined,
+        };
+      });
+
+      setMatches(finalMatches);
     };
 
     fetchData();
