@@ -11,7 +11,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Team, UserProfile, Program, Studio } from '@/types';
+import { Team, UserProfile } from '@/types';
+import { transformProfile, transformTeam } from '@/lib/transforms';
 
 interface UseTeamsResult {
   /** List of available teams to swipe on */
@@ -32,21 +33,6 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
   const initialFetchDone = useRef(false);
-
-  /**
-   * Transforms profile data to UserProfile format
-   */
-  const transformProfile = useCallback((p: any): UserProfile => ({
-    id: p.id || p.user_id,
-    name: p.name,
-    program: p.program as Program,
-    skills: p.skills || [],
-    bio: p.bio || '',
-    studioPreference: p.studio_preference as Studio,
-    studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
-    avatar: p.avatar || undefined,
-    linkedIn: p.linkedin || undefined,
-  }), []);
 
   /**
    * Fetches teams from the database with their members
@@ -131,15 +117,9 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
       });
 
       // Transform teams data
-      const transformedTeams: Team[] = availableTeams.map(t => ({
-        id: t.id,
-        name: t.name,
-        description: t.description || '',
-        studio: t.studio as Studio,
-        members: membersByTeam.get(t.id) || [],
-        lookingFor: [],
-        skillsNeeded: t.skills_needed || [],
-        createdBy: t.created_by,
+      const transformedTeams: Team[] = availableTeams.map(t => transformTeam(t)).map(team => ({
+        ...team,
+        members: membersByTeam.get(team.id) || [],
       }));
 
       if (isMountedRef.current) {
@@ -154,7 +134,7 @@ export function useTeams(userId: string | undefined, hasProfile: boolean): UseTe
       }
       fetchingRef.current = false;
     }
-  }, [userId, transformProfile]);
+  }, [userId]);
 
   // Initial fetch and cleanup
   useEffect(() => {

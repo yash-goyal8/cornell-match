@@ -11,7 +11,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { UserProfile, Team, Program, Studio } from '@/types';
+import { UserProfile, Team } from '@/types';
+import { transformProfile, transformTeam } from '@/lib/transforms';
 
 export interface SwipeHistory {
   type: 'user' | 'team';
@@ -40,35 +41,6 @@ export function useActivityHistory(
   const [loading, setLoading] = useState(false);
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
-
-  /**
-   * Transforms profile data to UserProfile format
-   */
-  const transformProfile = useCallback((p: any): UserProfile => ({
-    id: p.user_id,
-    name: p.name,
-    program: p.program as Program,
-    skills: p.skills || [],
-    bio: p.bio || '',
-    studioPreference: p.studio_preference as Studio,
-    studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
-    avatar: p.avatar || undefined,
-    linkedIn: p.linkedin || undefined,
-  }), []);
-
-  /**
-   * Transforms team data to Team format
-   */
-  const transformTeam = useCallback((t: any): Team => ({
-    id: t.id,
-    name: t.name,
-    description: t.description || '',
-    studio: t.studio as Studio,
-    members: [],
-    lookingFor: [],
-    skillsNeeded: t.skills_needed || [],
-    createdBy: t.created_by,
-  }), []);
 
   /**
    * Loads activity history from the database using optimized queries
@@ -162,7 +134,7 @@ export function useActivityHistory(
       }
       fetchingRef.current = false;
     }
-  }, [userId, transformProfile, transformTeam]);
+  }, [userId]);
 
   // Deferred load - activity history is not critical for initial render
   useEffect(() => {
