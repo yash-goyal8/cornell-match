@@ -12,6 +12,7 @@ import Splash from "./pages/Splash";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import MainApp from "./pages/Index";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const App = () => (
@@ -34,6 +35,9 @@ const App = () => (
               
               {/* Main app for authenticated users with profile */}
               <Route path="/app" element={<MainApp />} />
+              
+              {/* Admin dashboard - role-gated */}
+              <Route path="/admin" element={<Admin />} />
               
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
