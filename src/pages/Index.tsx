@@ -11,7 +11,7 @@
  * @module pages/Index
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Plus, History } from 'lucide-react';
@@ -45,7 +45,7 @@ import { useActivityHistory } from '@/hooks/useActivityHistory';
 import { useSwipeActions } from '@/hooks/useSwipeActions';
 
 // Types & Utils
-import { UserProfile, Team, Program, Studio } from '@/types';
+import { UserProfile, Team } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { profileSchema, validateInput } from '@/lib/validation';

@@ -11,7 +11,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { UserProfile, Program, Studio } from '@/types';
+import { UserProfile } from '@/types';
+import { transformProfile } from '@/lib/transforms';
 
 interface UseProfilesResult {
   /** List of available user profiles to swipe on */
@@ -32,21 +33,6 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
   const isMountedRef = useRef(true);
   const fetchingRef = useRef(false);
   const initialFetchDone = useRef(false);
-
-  /**
-   * Transforms a database profile record into a UserProfile object
-   */
-  const transformProfile = useCallback((p: any): UserProfile => ({
-    id: p.user_id,
-    name: p.name,
-    program: p.program as Program,
-    skills: p.skills || [],
-    bio: p.bio || '',
-    studioPreference: p.studio_preference as Studio,
-    studioPreferences: (p.studio_preferences as Studio[]) || [p.studio_preference as Studio],
-    avatar: p.avatar || undefined,
-    linkedIn: p.linkedin || undefined,
-  }), []);
 
   /**
    * Fetches profiles from the database using optimized single query approach
@@ -104,7 +90,7 @@ export function useProfiles(userId: string | undefined, hasProfile: boolean): Us
       }
       fetchingRef.current = false;
     }
-  }, [userId, transformProfile]);
+  }, [userId]);
 
   // Initial fetch and cleanup
   useEffect(() => {

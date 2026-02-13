@@ -16,7 +16,7 @@ export const SwipeableCard = ({ profile, onSwipe, onTap, isTop }: SwipeableCardP
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const nopeOpacity = useTransform(x, [-100, 0], [1, 0]);
 
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const threshold = 120;
     
     if (info.offset.x > threshold) {
