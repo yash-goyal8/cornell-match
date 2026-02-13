@@ -2,3 +2,6 @@ project_id = "kdtcingsflftxembrnyt"
 
 [functions.rate-limit]
 verify_jwt = false
+
+[functions.admin-actions]
+verify_jwt = true

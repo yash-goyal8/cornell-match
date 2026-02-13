@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { Users, User, MessageCircle, UserCircle, LogOut, Shield } from 'lucide-react';
+import { Users, User, MessageCircle, UserCircle, LogOut, Shield, LayoutDashboard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { InitialsAvatar } from '@/components/InitialsAvatar';
+import { useAdminRole } from '@/hooks/useAdminRole';
 
 interface HeaderProps {
   activeTab: 'individuals' | 'teams';
@@ -25,6 +27,8 @@ interface HeaderProps {
 
 export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0, onProfileClick, onChatClick, onPrivacyClick, userAvatar, userName = 'User', onSignOut }: HeaderProps) => {
   const hasNotifications = matchCount > 0 || unreadCount > 0;
+  const { isAdmin } = useAdminRole();
+  const navigate = useNavigate();
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/50">
       <div className="container mx-auto px-4">
@@ -112,6 +116,15 @@ export const Header = ({ activeTab, onTabChange, matchCount = 0, unreadCount = 0
                   <Shield className="w-4 h-4 mr-2" />
                   Privacy & Security
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/admin')}>
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Admin Dashboard
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onSignOut} className="text-destructive">
                   <LogOut className="w-4 h-4 mr-2" />
