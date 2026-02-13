@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { InitialsAvatar } from '@/components/InitialsAvatar';
+import { useAuth } from '@/contexts/AuthContext';
+import { uploadAvatar } from '@/lib/avatarUpload';
 
 interface MyProfileModalProps {
   profile: Omit<UserProfile, 'id'> | null;
@@ -36,6 +38,7 @@ const studios: { value: Studio; label: string }[] = [
 ];
 
 export const MyProfileModal = ({ profile, isOpen, onClose, onSave }: MyProfileModalProps) => {
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Omit<UserProfile, 'id'> | null>(profile);
   const [newSkill, setNewSkill] = useState('');
@@ -82,17 +85,20 @@ export const MyProfileModal = ({ profile, isOpen, onClose, onSave }: MyProfileMo
     }
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && editedProfile) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+    if (file && editedProfile && user) {
+      try {
+        const url = await uploadAvatar(user.id, file);
         setEditedProfile({
           ...editedProfile,
-          avatar: reader.result as string,
+          avatar: url,
         });
-      };
-      reader.readAsDataURL(file);
+        toast.success('Photo uploaded!');
+      } catch (err) {
+        console.error('Avatar upload failed:', err);
+        toast.error('Failed to upload photo');
+      }
     }
   };
 
